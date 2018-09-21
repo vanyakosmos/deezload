@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 import sys
+from enum import Enum, auto
 from typing import Dict, List, Optional, Tuple
 
 import eyed3
@@ -20,6 +21,12 @@ logger = logging.getLogger(__name__)
 
 class AppException(Exception):
     pass
+
+
+class LoadStatus(Enum):
+    STARTED = auto()
+    FINISHED = auto()
+    SKIPPED = auto()
 
 
 class Track(object):
@@ -280,14 +287,15 @@ class Loader(object):
     def load_gen(self):
         options = get_ytdl_options(self.output_dir, format=self.format)
         with YoutubeDL(options) as ydl:
-            for track in self.tracks:
+            for i, track in enumerate(self.tracks):
                 logger.debug('getting video id for: %s', track.full_name)
+                yield LoadStatus.STARTED, i, track
                 if not track.valid:
+                    yield LoadStatus.SKIPPED, i, track
                     continue
                 logger.info('Loading track: %s', track)
-                yield False, track
                 ydl.download([track.url])
-                yield True, track
+                yield LoadStatus.FINISHED, i, track
 
         tracks_map = {
             track.video_id: track
