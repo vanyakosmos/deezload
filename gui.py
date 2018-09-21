@@ -1,8 +1,16 @@
-import tkinter as tk
+import logging
+from pathlib import Path
+from tkinter import *
 from tkinter import filedialog
+from tkinter.ttk import Progressbar
+
+from app import LoadStatus, Loader, setup_logging
 
 
-class Application(tk.Frame):
+logger = logging.getLogger(__name__)
+
+
+class Application(Frame):
     def __init__(self, master=None, *args, **kwargs):
         """
         list_id - text
@@ -15,46 +23,152 @@ class Application(tk.Frame):
         """
         super().__init__(master, *args, **kwargs)
         self.root = master
-        self.pack()
+        self.grid(padx=20, pady=20)
+        self.rowconfigure(0, weight=1)
+        self.columnconfigure(0, weight=1)
 
-        list_id = tk.Entry(master)
-        list_id.pack()
+        self.list_id = StringVar()
+        self.list_type = StringVar()
+        self.output_dir = StringVar(value=str(Path.home()))
+        self.format = StringVar()
+        self.index = StringVar(value='0')
+        self.limit = StringVar(value='50')
+        self.use_tree = StringVar(value='0')
+        self.logs_var = StringVar(value='foo')
 
-        output_dir_btn = tk.Button(master, text="Output directory", command=self.browse_button)
-        output_dir_btn.pack()
-        output_dir_lbl = tk.Label(master)
-        output_dir_lbl.pack()
+        self.download_btn: Button = None
+        self.info_label: Label = None
+        self.progress: Progressbar = None
 
-        list_type_options = ('auto from url', 'playlist', 'album', 'track')
-        list_type = tk.StringVar()
-        list_type.set(list_type_options[0])
-        list_type_menu = tk.OptionMenu(master, list_type, *list_type_options)
-        list_type_menu.pack()
+        list_params_frame = Frame(self, width=400)
+        output_dir_frame = Frame(self, width=400)
+        misc_frame = Frame(self, width=400)
+        download_frame = Frame(self, width=400)
 
-        limit = tk.Entry(master)
-        limit.pack()
+        self.set_list_params_frame(list_params_frame)
+        self.set_output_dir_frame(output_dir_frame)
+        self.set_misc_frame(misc_frame)
+        self.set_download_frame(download_frame)
+
+        list_params_frame.grid(row=0, pady=(0, 20), sticky='ew')
+        output_dir_frame.grid(row=1, pady=(0, 20), sticky='ew')
+        misc_frame.grid(row=2, pady=(0, 20), sticky='ew')
+        download_frame.grid(row=3, sticky='ew')
+
+    def set_list_params_frame(self, frame: Frame):
+        label = LabelFrame(frame, text='List id or URL', borderwidth=0)
+        label.grid(row=0, column=0, sticky='w', columnspan=10)
+
+        list_id_entry = Entry(label, textvariable=self.list_id, width=50)
+        list_id_entry.focus_set()
+        list_id_entry.pack()
+        # list_id_entry.grid(row=0, column=0, sticky='ew')
+
+        label = Label(frame, text='List type')
+        label.grid(row=1, column=0, sticky='w')
+
+        list_type_options = ('from url', 'playlist', 'album', 'profile')
+        self.list_type.set(list_type_options[0])
+        list_type_menu = OptionMenu(frame, self.list_type, *list_type_options)
+        list_type_menu.grid(row=1, column=1, sticky='w')
+
+    def set_output_dir_frame(self, frame: Frame):
+        label = LabelFrame(frame, text='Output dir', borderwidth=0)
+        label.grid(row=0, column=0, sticky='w')
+
+        output_dir = Entry(label, textvariable=self.output_dir, width=44)
+        output_dir.pack(side=LEFT, fill=X)
+
+        output_dir_btn = Button(label, text="pick", command=self.browse_button)
+        output_dir_btn.pack(side=LEFT)
+
+    def set_misc_frame(self, frame: Frame):
+        def validate_int(value: str, acttyp: str):
+            if acttyp == '1':  # insert
+                try:
+                    int(value)
+                    return True
+                except ValueError:
+                    return False
+            return True
+
+        limit_label = Label(frame, text='Load limit')
+        limit_label.grid(row=0, column=0, sticky='w')
+
+        limit_entry = Entry(frame, textvariable=self.limit, validate="key")
+        limit_entry['validatecommand'] = (limit_entry.register(validate_int), '%P', '%d')
+        limit_entry.grid(row=0, column=1, sticky='w')
+
+        index_label = Label(frame, text='Start index')
+        index_label.grid(row=1, column=0, sticky='w')
+
+        index_entry = Entry(frame, textvariable=self.index, validate="key")
+        index_entry['validatecommand'] = (limit_entry.register(validate_int), '%P', '%d')
+        index_entry.grid(row=1, column=1, sticky='w')
+
+        format_label = Label(frame, text='Audio format')
+        format_label.grid(row=2, column=0, sticky='w')
 
         format_options = ('mp3', 'flac', 'best')
-        format = tk.StringVar()
-        format.set(format_options[0])
-        format_menu = tk.OptionMenu(master, format, *format_options)
-        format_menu.pack()
+        self.format.set(format_options[0])
+        format_menu = OptionMenu(frame, self.format, *format_options)
+        format_menu.grid(row=2, column=1, sticky='w')
 
-        use_tree = tk.BooleanVar()
-        tree_checkbox = tk.Checkbutton(master, text="tree", variable=use_tree)
-        tree_checkbox.pack()
+        tree_checkbox = Checkbutton(frame, text="save as tree (artist / album / song)",
+                                    onvalue='1', offvalue='0',
+                                    variable=self.use_tree)
+        tree_checkbox.grid(row=3, column=0, sticky='w', columnspan=2)
 
-        debug = tk.BooleanVar()
-        debug_checkbox = tk.Checkbutton(master, text="debug", variable=debug)
-        debug_checkbox.pack()
+    def set_download_frame(self, frame: Frame):
+        self.download_btn = Button(frame, text='Download', width=48,
+                                   command=self.download)
+        self.download_btn.grid(row=0, sticky='ew')
 
-        logs_entry = tk.Entry(master)
-        logs_entry.configure(state="readonly")
-        logs_entry.pack()
+        self.info_label = Label(frame, font='Helvetica 14 bold')
+        self.info_label.grid(row=1, sticky='ew', pady=5)
+
+        self.progress = Progressbar(frame, orient="horizontal", value=0,
+                                    style="red.Horizontal.TProgressbar")
+        self.progress.grid(row=2, sticky='ew')
 
     def browse_button(self):
         filename = filedialog.askdirectory()
-        print(filename)
+        if filename:
+            self.output_dir.set(filename)
+
+    def download(self):
+        try:
+            loader = Loader(
+                list_id=self.list_id.get(),
+                list_type=self.list_type.get(),
+                output_dir=self.output_dir.get(),
+                index=int(self.index.get()),
+                limit=int(self.limit.get()),
+                format=self.format.get(),
+                tree=self.use_tree.get() == '1',
+            )
+            self.info_label.config(text='Starting...', fg='black')
+            self.progress['value'] = 0
+            self.output_dir.set(loader.output_dir)
+            self.update()
+            loaded = len(loader)
+            for status, i, track in loader.load_gen():
+                percent = int((i + 1) / len(loader) * 100)
+                if status == LoadStatus.STARTED:
+                    self.info_label.config(text=f"loaded: {i}/{len(loader)}")
+                    self.info_label.update()
+                elif status == LoadStatus.FINISHED:
+                    logger.debug('loaded track %s', track)
+                    self.progress['value'] = percent
+                    self.progress.update()
+                elif status == LoadStatus.SKIPPED:
+                    loaded -= 1
+            self.info_label.config(text=f"done: {loaded}/{len(loader)}")
+            self.info_label.update()
+        except Exception as e:
+            logger.exception(e)
+            self.info_label.config(text=str(e), fg='red')
+            self.info_label.update()
 
 
 def center(win, width=None, height=None):
@@ -73,20 +187,15 @@ def raise_to_the_top(win):
     win.after_idle(win.call, 'wm', 'attributes', '.', '-topmost', False)
 
 
-def get_size():
-    # todo
-    return 600, 400
-
-
 def main():
-    root = tk.Tk()
+    setup_logging(debug=True)
+    root = Tk()
+
     app = Application(master=root)
 
-    root.title("deezer playlist downloader")
-    width, height = get_size()
-    # root.maxsize(width, height)
-    root.minsize(width, height)
-    center(root, width, height)
+    root.title("deezer songs downloader")
+    center(root)
+    root.resizable(width=False, height=False)
 
     raise_to_the_top(root)
     app.mainloop()
