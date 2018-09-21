@@ -24,6 +24,8 @@ class Track(object):
         self.title = title
         self.album = album
         self.video_id = get_video(self.full_name)
+        if self.video_id is None:
+            logger.info("Didn't find video for track %r", self.full_name)
 
     def __str__(self):
         return f'<track {self.video_id}: {self.full_name}>'
@@ -43,6 +45,7 @@ class Data(object):
         self.tracks = {
             track.video_id: track
             for track in tracks
+            if track.video_id
         }
 
     @property
