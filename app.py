@@ -6,7 +6,7 @@ import os
 import re
 import shutil
 import sys
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import eyed3
 import requests
@@ -18,17 +18,36 @@ YOUTUBE_VIDEO_REGEX = re.compile(r'/watch\?([^\"]+)', re.I | re.M | re.U)
 logger = logging.getLogger(__name__)
 
 
+class AppException(Exception):
+    pass
+
+
 class Track(object):
     def __init__(self, artist: str, title: str, album: Optional[str] = None):
         self.artist = artist
         self.title = title
         self.album = album
-        self.video_id = get_video(self.full_name)
-        if self.video_id is None:
-            logger.info("Didn't find video for track %r", self.full_name)
+        self.video_id = None
+        self.checked = False
 
     def __str__(self):
         return f'<track {self.video_id}: {self.full_name}>'
+
+    def __repr__(self):
+        return str(self)
+
+    def fetch_video_url(self):
+        self.video_id = get_video_id(self.full_name)
+        if self.video_id is None:
+            logger.info("Didn't find video for track %r", self.full_name)
+
+    @property
+    def valid(self):
+        if self.checked:
+            return self.video_id is not None
+        self.fetch_video_url()
+        self.checked = True
+        return self.valid
 
     @property
     def full_name(self) -> str:
@@ -39,52 +58,78 @@ class Track(object):
         return f'http://www.youtube.com/watch?v={self.video_id}'
 
 
-class Data(object):
-    def __init__(self, tracks: List[Track]):
-        tracks = list(filter(lambda x: x.video_id, tracks))
-        self.tracks = {
-            track.video_id: track
-            for track in tracks
-            if track.video_id
-        }
-
-    @property
-    def urls(self):
-        return [v.url for v in self.tracks.values()]
-
-    def __getitem__(self, video_id) -> Optional[Track]:
-        return self.tracks.get(video_id, None)
-
-
-def deezer_url(*args) -> str:
+def deezer_url(*args, qs: Optional[dict] = None) -> str:
+    args = list(args)
+    if qs:
+        pairs = [
+            f'{name}={value}'
+            for name, value in qs.items()
+        ]
+        args.append('?' + '&'.join(pairs))
     return '/'.join([DEEZER_API_ROOT, *args])
 
 
-def parse_input(list_type: str, list_id: str):
+def parse_input(list_type: str, list_id: str) -> str:
     parts = list_id.split('/')
+    res = (list_type, list_id)
     if len(parts) >= 2:
-        list_type, list_id = parts[-2:]
-    return list_type, list_id
+        if parts[-1].isdigit():
+            res = parts[-2:]
+        if parts[-2].isdigit():
+            res = parts[-3:]
+    return '/'.join(res)
 
 
-def get_tracks(list_type: str, playlist_id: str) -> Tuple[List[Track], str]:
-    """
-    Track def:
-        - album
-            - cover
-            - title
-        - artist
-            - name
-        - duration
-        - title
-    """
-    if list_type not in ('playlist', 'album'):
+def build_api_url(url: str, index=0, limit=50):
+    url = url.strip('/')
+    parts = url.split('/')
+    qs = {'limit': limit, 'index': index}
+
+    if len(parts) < 2:
+        return
+
+    if parts[-2] == 'album':
+        return deezer_url('album', parts[-1], 'tracks', qs=qs)
+    if parts[-2] == 'playlist':
+        return deezer_url('playlist', parts[-1], 'tracks', qs=qs)
+    if parts[-2] == 'profile':
+        return deezer_url('user', parts[-1], 'tracks', qs=qs)
+    if parts[-3] == 'profile':
+        return deezer_url('user', parts[-2], 'tracks', qs=qs)
+    if parts[-2] == 'track':
+        return deezer_url('track', parts[-1], qs=qs)
+    if parts[-2] == 'artist':
+        return deezer_url('artist', parts[-1], 'top', qs=qs)
+
+
+def get_tracks(list_type: str, list_id: str, index=0, limit=50) -> Tuple[List[Track], str]:
+    if not list_id:
+        raise AppException("List id can't be empty.")
+
+    if list_type not in ('playlist', 'album', 'profile'):
         list_type = 'playlist'
-    url = deezer_url(list_type, playlist_id)
-    res = requests.get(url)
+
+    url = list_id
+    api_url = build_api_url(url, index, limit)
+    from_url = api_url is not None
+
+    if not from_url:
+        api_url = deezer_url(list_type, list_id, 'tracks', qs={'limit': limit, 'index': index})
+
+    logger.debug(api_url)
+    res = requests.get(api_url)
     data = res.json()
-    list_name = data['title']
-    tracks = data['tracks']['data']
+    if res.status_code != 200 or 'error' in data:
+        logger.error(data)
+        if from_url:
+            raise AppException(f"Bad url: {url}")
+        raise AppException(f"Invalid list type and id: {list_type} / {list_id}")
+
+    logger.debug('load status %s', res.status_code)
+    if 'data' in data:
+        tracks = data['data']
+    else:
+        tracks = [data]  # when fetching single track
 
     for i, track in enumerate(tracks):
         tracks[i] = Track(
@@ -93,7 +138,7 @@ def get_tracks(list_type: str, playlist_id: str) -> Tuple[List[Track], str]:
             album=track['album']['title'],
         )
         logger.debug('got track: %s', tracks[i])
-    return tracks, list_name
+    return tracks
 
 
 def extract_video_id(qs: str) -> Optional[str]:
@@ -108,7 +153,7 @@ def extract_video_id(qs: str) -> Optional[str]:
     return
 
 
-def get_video(song_name) -> Optional[str]:
+def get_video_id(song_name) -> Optional[str]:
     search_res = requests.get(f'https://m.youtube.com/results?search_query={song_name}')
     search_res = search_res.content.decode('utf-8')
     videos = YOUTUBE_VIDEO_REGEX.findall(search_res)
@@ -149,18 +194,18 @@ def get_output_dir(root: str, list_name: str) -> str:
     return dir_path
 
 
-def tracks_in_dir(output_dir: str, data: Data):
+def tracks_in_dir(output_dir: str, track_map: Dict[str, Track]):
     for file_path in glob.glob(os.path.join(output_dir, '*')):
         file_name = os.path.basename(file_path)
         video_id, file_ext = os.path.splitext(file_name)
-        track = data[video_id]
+        track = track_map.get(video_id, None)
         if track:
             yield file_path, track, file_ext
 
 
-def restore_meta(output_dir: str, data: Data):
+def restore_meta(output_dir: str, track_map: Dict[str, Track]):
     logger.debug('restoring metadata...')
-    for file_path, track, file_ext in tracks_in_dir(output_dir, data):
+    for file_path, track, file_ext in tracks_in_dir(output_dir, track_map):
         audio = eyed3.load(file_path)
         audio.tag.artist = track.artist
         audio.tag.album = track.album
@@ -169,10 +214,10 @@ def restore_meta(output_dir: str, data: Data):
         audio.tag.save()
 
 
-def fix_file_names(output_dir: str, data: Data, tree=False):
+def fix_file_names(output_dir: str, track_map: Dict[str, Track], tree=False):
     """Fix name and put in right directories."""
     logger.debug('sorting files...')
-    for file_path, track, file_ext in tracks_in_dir(output_dir, data):
+    for file_path, track, file_ext in tracks_in_dir(output_dir, track_map):
         if tree:
             dst_path = os.path.join(output_dir, track.artist, track.album or 'unknown album')
             os.makedirs(dst_path, exist_ok=True)
@@ -215,31 +260,54 @@ def setup_logging(debug=False, stream=None):
         logging.getLogger(module).setLevel(logging.WARNING)
 
 
-def load_playlist(list_id: str, list_type='playlist', output_dir=None,
-                  limit=1000, format='mp3', tree=False):
-    logger.info('Fetching download links...')
-    list_type, list_id = parse_input(list_type, list_id)
-    tracks, list_name = get_tracks(list_type, list_id)
+class Loader(object):
+    def __init__(self, list_id: str, list_type='playlist', output_dir=None,
+                 index=0, limit=50, format='mp3', tree=False):
+        self.format = format
+        self.tree = tree
 
-    data = Data(tracks[:limit])
-    output_dir = output_dir or get_output_dir(os.getcwd(), list_name)
-    output_dir = os.path.abspath(output_dir)
+        tracks = get_tracks(list_type, list_id, index, limit)
+        self.tracks = tracks[:limit]
 
-    options = get_ytdl_options(output_dir, format=format)
-    with YoutubeDL(options) as ydl:
-        for track in data.tracks.values():
-            logger.info('Loading track: %s', track)
-            ydl.download([track.url])
+        output_dir = output_dir or get_output_dir(os.getcwd(), 'deezload_result')
+        self.output_dir = os.path.abspath(output_dir)
+        os.makedirs(self.output_dir, exist_ok=True)
+        logger.debug('output dir: %s', self.output_dir)
 
-    restore_meta(output_dir, data)
-    fix_file_names(output_dir, data, tree=tree)
+    def __len__(self):
+        return len(self.tracks)
+
+    def load_gen(self):
+        options = get_ytdl_options(self.output_dir, format=self.format)
+        with YoutubeDL(options) as ydl:
+            for track in self.tracks:
+                logger.debug('getting video id for: %s', track.full_name)
+                if not track.valid:
+                    continue
+                logger.info('Loading track: %s', track)
+                yield False, track
+                ydl.download([track.url])
+                yield True, track
+
+        tracks_map = {
+            track.video_id: track
+            for track in self.tracks
+            if track.video_id
+        }
+        restore_meta(self.output_dir, tracks_map)
+        fix_file_names(self.output_dir, tracks_map, tree=self.tree)
+
+    def load(self):
+        for _ in self.load_gen():
+            pass
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('list_id', type=str)
     parser.add_argument('-t', dest='list_type', type=str, default='playlist', help='list type')
-    parser.add_argument('-l', dest='limit', type=int, default=1000, help='load limit')
+    parser.add_argument('-i', dest='index', type=int, default=0, help='start index')
+    parser.add_argument('-l', dest='limit', type=int, default=50, help='load limit')
     parser.add_argument('-d', dest='debug', action='store_true', help='debug mode')
     parser.add_argument('-o', dest='output_dir', type=str, help='output directory')
     parser.add_argument('-f', dest='format', type=str, default='mp3', help='output file format')
@@ -249,8 +317,9 @@ def main():
     debug = args.debug or os.environ.get('DEBUG') == '1'
     setup_logging(debug)
     logger.debug('args: %s', args)
+    logger.info('Fetching download links...')
 
-    load_playlist(
+    loader = Loader(
         list_id=args.list_id,
         list_type=args.list_type,
         output_dir=args.output_dir,
@@ -258,6 +327,7 @@ def main():
         format=args.format,
         tree=args.tree,
     )
+    loader.load()
 
 
 if __name__ == '__main__':
