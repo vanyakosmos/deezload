@@ -58,7 +58,9 @@ def deezer_url(*args) -> str:
 
 
 def parse_input(list_type: str, list_id: str):
-    # todo
+    parts = list_id.split('/')
+    if len(parts) >= 2:
+        list_type, list_id = parts[-2:]
     return list_type, list_id
 
 
