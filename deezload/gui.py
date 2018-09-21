@@ -5,7 +5,7 @@ from tkinter import *
 from tkinter import filedialog
 from tkinter.ttk import Progressbar
 
-from app import LoadStatus, Loader, setup_logging
+from deezload.base import LoadStatus, Loader, setup_logging
 
 
 logger = logging.getLogger(__name__)
@@ -192,10 +192,8 @@ def raise_to_the_top(win):
     win.after_idle(win.call, 'wm', 'attributes', '.', '-topmost', False)
 
 
-def main():
-    setup_logging(debug=True)
+def start_app():
     root = Tk()
-
     app = Application(master=root)
 
     root.title("deezer songs downloader")
@@ -207,4 +205,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    setup_logging(debug=True)
+    start_app()
