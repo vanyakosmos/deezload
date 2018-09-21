@@ -1,4 +1,5 @@
 import logging
+import threading
 from pathlib import Path
 from tkinter import *
 from tkinter import filedialog
@@ -62,7 +63,6 @@ class Application(Frame):
         list_id_entry = Entry(label, textvariable=self.list_id, width=50)
         list_id_entry.focus_set()
         list_id_entry.pack()
-        # list_id_entry.grid(row=0, column=0, sticky='ew')
 
         label = Label(frame, text='List type')
         label.grid(row=1, column=0, sticky='w')
@@ -121,7 +121,7 @@ class Application(Frame):
 
     def set_download_frame(self, frame: Frame):
         self.download_btn = Button(frame, text='Download', width=48,
-                                   command=self.download)
+                                   command=self.download_click)
         self.download_btn.grid(row=0, sticky='ew')
 
         self.info_label = Label(frame, font='Helvetica 14 bold')
@@ -136,8 +136,12 @@ class Application(Frame):
         if filename:
             self.output_dir.set(filename)
 
+    def download_click(self):
+        threading.Thread(target=self.download).start()
+
     def download(self):
         try:
+            self.download_btn.configure(state=DISABLED)
             loader = Loader(
                 list_id=self.list_id.get(),
                 list_type=self.list_type.get(),
@@ -164,7 +168,8 @@ class Application(Frame):
                 elif status == LoadStatus.SKIPPED:
                     loaded -= 1
             self.info_label.config(text=f"done: {loaded}/{len(loader)}")
-            self.info_label.update()
+            self.download_btn.configure(state=NORMAL)
+            self.update()
         except Exception as e:
             logger.exception(e)
             self.info_label.config(text=str(e), fg='red')
