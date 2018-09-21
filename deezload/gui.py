@@ -140,8 +140,8 @@ class Application(Frame):
         threading.Thread(target=self.download).start()
 
     def download(self):
+        self.download_btn.configure(state=DISABLED)
         try:
-            self.download_btn.configure(state=DISABLED)
             loader = Loader(
                 list_id=self.list_id.get(),
                 list_type=self.list_type.get(),
@@ -168,12 +168,13 @@ class Application(Frame):
                 elif status == LoadStatus.SKIPPED:
                     loaded -= 1
             self.info_label.config(text=f"done: {loaded}/{len(loader)}")
-            self.download_btn.configure(state=NORMAL)
             self.update()
         except Exception as e:
             logger.exception(e)
             self.info_label.config(text=str(e), fg='red')
             self.info_label.update()
+        finally:
+            self.download_btn.configure(state=NORMAL)
 
 
 def center(win, width=None, height=None):
