@@ -198,7 +198,7 @@ class Formatter(logging.Formatter):
         return result
 
 
-def setup_logging(debug=False):
+def setup_logging(debug=False, stream=None):
     root = logging.getLogger()
     if root.handlers:
         for handler in root.handlers:
@@ -207,12 +207,32 @@ def setup_logging(debug=False):
     logging.addLevelName(logging.DEBUG, '🐛')
     logging.addLevelName(logging.WARNING, '⚠️')
     logging.addLevelName(logging.ERROR, '😡')
-    handler = logging.StreamHandler(sys.stdout)
+    handler = logging.StreamHandler(stream or sys.stdout)
     handler.setFormatter(Formatter())
     logging.basicConfig(level=logging.DEBUG if debug else logging.INFO,
                         handlers=[handler])
     for module in ('urllib3', 'eyed3', 'youtube_dl'):
         logging.getLogger(module).setLevel(logging.WARNING)
+
+
+def load_playlist(list_id: str, list_type='playlist', output_dir=None,
+                  limit=1000, format='mp3', tree=False):
+    logger.info('Fetching download links...')
+    list_type, list_id = parse_input(list_type, list_id)
+    tracks, list_name = get_tracks(list_type, list_id)
+
+    data = Data(tracks[:limit])
+    output_dir = output_dir or get_output_dir(os.getcwd(), list_name)
+    output_dir = os.path.abspath(output_dir)
+
+    options = get_ytdl_options(output_dir, format=format)
+    with YoutubeDL(options) as ydl:
+        for track in data.tracks.values():
+            logger.info('Loading track: %s', track)
+            ydl.download([track.url])
+
+    restore_meta(output_dir, data)
+    fix_file_names(output_dir, data, tree=tree)
 
 
 def main():
@@ -230,22 +250,14 @@ def main():
     setup_logging(debug)
     logger.debug('args: %s', args)
 
-    logger.info('Fetching download links...')
-    list_type, list_id = parse_input(args.list_type, args.list_id)
-    tracks, list_name = get_tracks(list_type, list_id)
-
-    data = Data(tracks[:args.limit])
-    output_dir = args.output_dir or get_output_dir(os.getcwd(), list_name)
-    output_dir = os.path.abspath(output_dir)
-
-    options = get_ytdl_options(output_dir, format=args.format)
-    with YoutubeDL(options) as ydl:
-        for track in data.tracks.values():
-            logger.info('Loading track: %s', track)
-            ydl.download([track.url])
-
-    restore_meta(output_dir, data)
-    fix_file_names(output_dir, data, tree=args.tree)
+    load_playlist(
+        list_id=args.list_id,
+        list_type=args.list_type,
+        output_dir=args.output_dir,
+        limit=args.limit,
+        format=args.format,
+        tree=args.tree,
+    )
 
 
 if __name__ == '__main__':
