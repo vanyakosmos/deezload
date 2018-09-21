@@ -1,4 +1,3 @@
-import argparse
 import glob
 import html
 import logging
@@ -214,6 +213,9 @@ def restore_meta(output_dir: str, track_map: Dict[str, Track]):
     logger.debug('restoring metadata...')
     for file_path, track, file_ext in tracks_in_dir(output_dir, track_map):
         audio = eyed3.load(file_path)
+        if not audio:
+            logger.warning('%s, %s, %s', file_path, track, file_ext)
+            continue
         audio.tag.artist = track.artist
         audio.tag.album = track.album
         audio.tag.album_artist = track.artist
