@@ -7,6 +7,8 @@ Utility for downloading playlists, albums and favorite tracks from deezer.
 
 ```bash
 pip install deezload
+pip install deezload[pyinstaller]  # if want to build standalone app
+pip install git+https://github.com/vanyakosmos/deezload  # latest
 ```
 
 ### os x

@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name='deezload',
-    version='0.1.1',
+    version='0.1.2',
     packages=['deezload'],
     url='https://github.com/vanyakosmos/deezload',
     license='MIT',
@@ -12,8 +12,7 @@ setup(
     description='Song downloading from deezer.',
     install_requires=['eyed3', 'youtube_dl', 'requests'],
     extras_require={
-        "bcrypt": ["bcrypt"],
-        "argon2": ["argon2-cffi >= 16.1.0"],
+        "pyinstaller": ["pyinstaller"],
     },
     entry_points={
         'console_scripts': [
