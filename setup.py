@@ -3,9 +3,9 @@ from setuptools import setup
 
 setup(
     name='deezload',
-    version='0.1.0',
+    version='0.1.1',
     packages=['deezload'],
-    url='https://github.com/vaniakosmos/deezload',
+    url='https://github.com/vanyakosmos/deezload',
     license='MIT',
     author='Bachynin Ivan',
     author_email='bachynin.i@gmail.com',
