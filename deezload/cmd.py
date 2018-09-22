@@ -23,7 +23,7 @@ def build_app(output_dir: str):
         '--name', 'deezload',
         '--distpath', os.path.join(output_dir, 'dist'),
         '--workpath', os.path.join(output_dir, 'build'),
-        os.path.join('deezload', 'cmd.py')
+        os.path.join(package_root, 'deezload', 'cmd.py')
     ])
 
 
