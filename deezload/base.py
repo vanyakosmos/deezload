@@ -8,7 +8,7 @@ import sys
 from enum import Enum, auto
 from typing import Dict, List, Optional, Tuple
 
-import eyed3
+import mutagen
 import requests
 from youtube_dl import YoutubeDL
 
@@ -212,15 +212,16 @@ def tracks_in_dir(output_dir: str, track_map: Dict[str, Track]):
 def restore_meta(output_dir: str, track_map: Dict[str, Track]):
     logger.debug('restoring metadata...')
     for file_path, track, file_ext in tracks_in_dir(output_dir, track_map):
-        audio = eyed3.load(file_path)
-        if not audio:
-            logger.warning('%s, %s, %s', file_path, track, file_ext)
-            continue
-        audio.tag.artist = track.artist
-        audio.tag.album = track.album
-        audio.tag.album_artist = track.artist
-        audio.tag.title = track.title
-        audio.tag.save()
+        try:
+            audio = mutagen.File(file_path)
+            audio['artist'] = track.artist
+            audio['album_artist'] = track.artist
+            audio['album'] = track.album
+            audio['title'] = track.title
+            audio.save()
+        except Exception as e:
+            logger.warning('failed to restore meta: %s, %s', file_path, track)
+            logger.warning(e)
 
 
 def fix_file_names(output_dir: str, track_map: Dict[str, Track], tree=False):
@@ -267,6 +268,8 @@ def setup_logging(debug=False, stream=None):
                         handlers=[handler])
     for module in ('urllib3', 'eyed3', 'youtube_dl'):
         logging.getLogger(module).setLevel(logging.WARNING)
+    if debug:
+        logging.getLogger('youtube_dl').setLevel(logging.DEBUG)
 
 
 class Loader(object):

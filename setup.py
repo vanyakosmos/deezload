@@ -3,14 +3,14 @@ from setuptools import setup
 
 setup(
     name='deezload',
-    version='0.1.3',
+    version='0.1.4',
     packages=['deezload'],
     url='https://github.com/vanyakosmos/deezload',
     license='MIT',
     author='Bachynin Ivan',
     author_email='bachynin.i@gmail.com',
     description='Song downloading from deezer.',
-    install_requires=['eyed3', 'youtube_dl', 'requests'],
+    install_requires=['mutagen', 'youtube_dl', 'requests'],
     extras_require={
         "pyinstaller": ["pyinstaller"],
     },
