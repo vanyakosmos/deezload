@@ -6,7 +6,7 @@ import re
 import shutil
 import sys
 from enum import Enum, auto
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import mutagen
 import requests
@@ -37,7 +37,7 @@ class Track(object):
         self.checked = False
 
     def __str__(self):
-        return f'<track {self.video_id}: {self.full_name}>'
+        return f'<track {self.video_id}: {repr(self.full_name)}>'
 
     def __repr__(self):
         return str(self)
@@ -57,7 +57,7 @@ class Track(object):
 
     @property
     def full_name(self) -> str:
-        return f'{self.artist} - {self.title}'
+        return f'{self.artist} - {self.album} - {self.title}'
 
     @property
     def url(self) -> str:
@@ -95,20 +95,25 @@ def build_api_url(url: str, index=0, limit=50):
         return
 
     if parts[-2] == 'album':
-        return deezer_url('album', parts[-1], 'tracks', qs=qs)
+        return 'album', deezer_url('album', parts[-1], qs=qs)
+
     if parts[-2] == 'playlist':
-        return deezer_url('playlist', parts[-1], 'tracks', qs=qs)
+        return 'playlist', deezer_url('playlist', parts[-1], 'tracks', qs=qs)
+
     if parts[-2] == 'profile':
-        return deezer_url('user', parts[-1], 'tracks', qs=qs)
-    if parts[-3] == 'profile':
-        return deezer_url('user', parts[-2], 'tracks', qs=qs)
+        return 'profile', deezer_url('user', parts[-1], 'tracks', qs=qs)
+
+    if len(parts) >= 3 and parts[-3] == 'profile':
+        return 'profile', deezer_url('user', parts[-2], 'tracks', qs=qs)
+
     if parts[-2] == 'track':
-        return deezer_url('track', parts[-1], qs=qs)
+        return 'track', deezer_url('track', parts[-1], qs=qs)
+
     if parts[-2] == 'artist':
-        return deezer_url('artist', parts[-1], 'top', qs=qs)
+        return 'artist', deezer_url('artist', parts[-1], 'top', qs=qs)
 
 
-def get_tracks(list_type: str, list_id: str, index=0, limit=50) -> Tuple[List[Track], str]:
+def get_tracks(list_type: str, list_id: str, index=0, limit=50) -> List[Track]:
     if not list_id:
         raise AppException("List id can't be empty.")
 
@@ -116,10 +121,12 @@ def get_tracks(list_type: str, list_id: str, index=0, limit=50) -> Tuple[List[Tr
         list_type = 'playlist'
 
     url = list_id
-    api_url = build_api_url(url, index, limit)
-    from_url = api_url is not None
+    list_type_and_api_url = build_api_url(url, index, limit)
+    from_url = list_type_and_api_url is not None
 
-    if not from_url:
+    if from_url:
+        list_type, api_url = list_type_and_api_url
+    else:
         api_url = deezer_url(list_type, list_id, 'tracks', qs={'limit': limit, 'index': index})
 
     logger.debug(api_url)
@@ -132,19 +139,27 @@ def get_tracks(list_type: str, list_id: str, index=0, limit=50) -> Tuple[List[Tr
         raise AppException(f"Invalid list type and id: {list_type} / {list_id}")
 
     logger.debug('load status %s', res.status_code)
-    if 'data' in data:
+    if list_type in ('playlist', 'profile', 'artist'):
         tracks = data['data']
-    else:
-        tracks = [data]  # when fetching single track
+    elif list_type == 'album':
+        tracks = data['tracks']['data']
+        for track in tracks:
+            track['album'] = {
+                'title': data['title']
+            }
+    else:  # list_type == 'track'
+        tracks = [data]
 
-    for i, track in enumerate(tracks):
-        tracks[i] = Track(
+    result = []
+    for i, track in enumerate(tracks[:limit]):
+        track = Track(
             artist=track['artist']['name'],
             title=track['title'],
             album=track['album']['title'],
         )
-        logger.debug('got track: %s', tracks[i])
-    return tracks
+        logger.debug('got track: %s', track)
+        result.append(track)
+    return result
 
 
 def extract_video_id(qs: str) -> Optional[str]:
