@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>deezload</title>
+
+    <link rel="stylesheet"
+          href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css">
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js"></script>
+
+    <style>
+        .message-box > div {
+            margin-bottom: 5px;
+            padding: 10px 20px;
+            border-radius: .3rem;
+
+        }
+        .start-msg {
+            background: rgba(72, 211, 98, 0.2);
+            margin-right: 30px;
+        }
+        .info-msg {
+            background: rgba(72, 211, 98, 0.1);
+            margin-left: 30px;
+        }
+        .warn-msg {
+            background: rgba(220, 255, 37, 0.1);
+            margin-left: 30px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="jumbotron">
+        <h1 class="display-4" style="text-align: center">deezload</h1>
+    </div>
+
+    <div id="main-win">
+        <form id="main-form">
+            <div class="form-group">
+                <label for="url-input">Deezer URL of playlist, artist, album or user profile</label>
+                <input name="url" type="text" class="form-control" id="url-input" placeholder="url">
+            </div>
+
+            <div class="form-row">
+                <div class="form-group col-md-4">
+                    <label for="index">index</label>
+                    <input name="index" type="number" class="form-control" id="index" value="0"
+                           min="0">
+                </div>
+
+                <div class="form-group col-md-4">
+                    <label for="limit">limit</label>
+                    <input name="limit" type="number" class="form-control" id="limit" value="50"
+                           min="1">
+                </div>
+
+                <div class="form-group col-md-4">
+                    <label for="audio-format">audio format</label>
+                    <select name="format" class="form-control" id="audio-format">
+                        <option value="mp3" selected>mp3</option>
+                        <option value="flac">flac</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="form-check">
+                    <input name="tree" class="form-check-input" type="checkbox" id="tree" checked
+                           autocomplete="off">
+                    <label class="form-check-label" for="tree">
+                        save as tree
+                    </label>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-lg btn-block" id="download-btn">
+                download
+            </button>
+        </form>
+    </div>
+
+
+    <div style="display: none" id="load-win">
+        <div class="progress" style="margin-bottom: 20px">
+            <div id="progress" class="progress-bar" role="progressbar" style="width: 0;"></div>
+        </div>
+        <div id="logs" class="message-box" style="overflow-y: scroll; height:360px;">
+        </div>
+        <button type="button" class="btn btn-danger btn-lg btn-block" id="stop-btn"
+                style="margin-top: 20px">
+            stop
+        </button>
+        <button type="button" class="btn btn-primary btn-lg btn-block" id="finish-btn"
+                style="margin-top: 20px; display: none">
+            finish
+        </button>
+    </div>
+</div>
+
+
+<script>
+    let loadUrl = new URL('load', window.location.href);
+    loadUrl.protocol = loadUrl.protocol.replace('http', 'ws');
+    let socket = new WebSocket(loadUrl.href);
+    // let loading = false;
+    let stopLoad = false;
+
+    let mainWin = document.getElementById('main-win');
+    let loadWin = document.getElementById('load-win');
+
+    let mainForm = document.getElementById('main-form');
+    let progress = document.getElementById('progress');
+    let logs = document.getElementById('logs');
+
+    // let downloadButton = document.getElementById('download-btn');
+    let stopButton = document.getElementById('stop-btn');
+    let finishButton = document.getElementById('finish-btn');
+
+    stopButton.onclick = function () {
+        // todo: show alert
+        stopLoad = true;
+    };
+
+    finishButton.onclick = function () {
+        mainWin.style.display = 'block';
+        loadWin.style.display = 'none';
+        finishButton.style.display = 'none';
+        stopButton.style.display = 'block';
+        logs.innerHTML = '';
+    };
+
+    mainForm.onsubmit = function (event) {
+        event.preventDefault();
+        let formData = new FormData(mainForm);
+        let data = {
+            'type': 'start',
+            'url': formData.get('url'),
+            'index': parseInt(formData.get('index').toString()),
+            'limit': parseInt(formData.get('limit').toString()),
+            'format': formData.get('format'),
+            'tree': !!formData.get('tree'),
+        };
+        socket.send(JSON.stringify(data));
+    };
+
+    socket.onmessage = function (event) {
+        let data = JSON.parse(event.data);
+        console.log('GOT');
+        console.log(data);
+
+        if (data.type === 'status') {
+            if (data.status === 'starting') {
+                logs.innerHTML += `<div class="start-msg">${data.message}</div>`;
+            }
+            else if (data.status === 'skipped'){
+                logs.innerHTML += `<div class="warn-msg">${data.message}</div>`;
+            }
+            else {
+                logs.innerHTML += `<div class="info-msg">${data.message}</div>`;
+            }
+
+            let proc = (data.index + data.prog) / data.size * 100;
+            proc = Math.round(proc);
+            proc = `${proc}%`;
+            progress.style.width = proc;
+            progress.textContent = proc;
+
+        } else if (data.type === 'error') {
+            // todo: show alert
+
+        } else if (data.type === 'start') {
+            mainWin.style.display = 'none';
+            loadWin.style.display = 'block';
+
+        } else if (data.type === 'complete') {
+            finishButton.style.display = 'block';
+            stopButton.style.display = 'none';
+        }
+
+        socket.send(JSON.stringify({
+            'type': 'ok',
+        }));
+    };
+</script>
+
+</body>
+</html>
