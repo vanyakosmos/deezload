@@ -175,6 +175,8 @@ def get_user(url: str) -> str:
 
     res = requests.get(api_url)
     data = res.json()
+    if 'error' in data:
+        raise AppException("Couldn't fetch user")
     return data['name']
 
 
