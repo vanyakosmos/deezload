@@ -1,6 +1,16 @@
 # deezload
 
-Utility for downloading playlists, albums and favorite tracks from deezer.
+Utility for downloading playlists, artist's top tracks, albums and favorite user's tracks from Deezer.
+
+
+## TOC
+
+- [install](#install)
+- [usage](#usage)
+	- [gui](#gui)
+	- [command line](#command-line)
+	- [standalone app](#build-standalone-app)
+- [how it works](#how-it-works)
 
 
 ## install
@@ -11,11 +21,13 @@ pip install deezload[pyinstaller]  # if want to build standalone app
 pip install git+https://github.com/vanyakosmos/deezload  # latest
 ```
 
-### os x
+### install ffmpeg
+
+os x:
 ```bash
 brew search ffmpeg
 ```
-### [another systems](https://github.com/adaptlearning/adapt_authoring/wiki/Installing-FFmpeg)
+another systems: [boop](https://github.com/adaptlearning/adapt_authoring/wiki/Installing-FFmpeg)
 
 
 ## usage
@@ -23,6 +35,7 @@ brew search ffmpeg
 ### gui
 
 ```bash
+# start
 deezload
 ```
 
@@ -32,13 +45,8 @@ deezload
 ### command line
 
 ```bash
-# basic
-deezload 123  # will load playlist with id=123
-deezload -t album 123
-deezload album/123
-deezload https://www.deezer.com/en/album/123
-
 # load album
+deezload album/123
 deezload https://www.deezer.com/en/album/123
 
 # load playlist
@@ -57,22 +65,21 @@ deezload https://www.deezer.com/en/artist/123
 
 help:
 ```
-usage: cmd.py [-h] [-t LIST_TYPE] [-i INDEX] [-l LIMIT] [-d] [-o OUTPUT_DIR]
-              [-f FORMAT] [--tree] [--build BUILD]
-              [list_id]
+usage: deezload [-h] [-i INDEX] [-l LIMIT] [-d] [-o OUTPUT_DIR] [-f FORMAT]
+                [--tree] [--build BUILD]
+                [urls [urls ...]]
 
 positional arguments:
-  list_id        list id or resource URL
+  urls           list of URLs
 
 optional arguments:
   -h, --help     show this help message and exit
-  -t LIST_TYPE   list type
   -i INDEX       start index
   -l LIMIT       load limit
   -d             debug mode
-  -o OUTPUT_DIR  output directory
-  -f FORMAT      output audio file format
-  --tree         save files as tree: artist/album/song
+  -o OUTPUT_DIR  output directory (default HOME/deezload)
+  -f FORMAT      output audio file format (default mp3)
+  --tree         save files as tree: artist/album/song (default true)
   --build BUILD  build output path
 ```
 
@@ -93,17 +100,4 @@ deezload --build path/to/build/output
 - search for each song on youtube
 - download audio steam and convert into needed format
 - restore songs metadata
-- save files as tree (if specified)
-
-### tree example
-```
-artist 1
-	album 1
-		song 1
-		song 2
-artist 2
-	album 1
-		song 1
-	album 1
-		song 1
-```
+- save files

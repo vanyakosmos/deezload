@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('urls', type=str, nargs='*',
-                        help='list id or resource URL')
+                        help="list of URLs")
     parser.add_argument('-i', dest='index', type=int, default=0,
                         help='start index')
     parser.add_argument('-l', dest='limit', type=int, default=50,
