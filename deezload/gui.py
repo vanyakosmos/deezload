@@ -6,7 +6,8 @@ from tkinter import *
 from tkinter import filedialog
 from tkinter.ttk import Progressbar
 
-from deezload.base import LoadStatus, Loader, setup_logging
+from deezload.base import LoadStatus, Loader
+from deezload.utils import setup_logging
 
 
 logger = logging.getLogger(__name__)
@@ -29,8 +30,7 @@ class Application(Frame):
         self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)
 
-        self.list_id = StringVar()
-        self.list_type = StringVar()
+        self.url = StringVar()
         self.output_dir = StringVar(value=os.path.join(str(Path.home()), 'deezload'))
         self.format = StringVar()
         self.index = StringVar(value='0')
@@ -58,30 +58,23 @@ class Application(Frame):
         download_frame.grid(row=3, sticky='ew')
 
     def set_list_params_frame(self, frame: Frame):
-        label = LabelFrame(frame, text='List id or URL', borderwidth=0)
+        label = LabelFrame(frame, text='Deezer URL of playlist, artist, album or user profile',
+                           borderwidth=0)
         label.grid(row=0, column=0, sticky='w', columnspan=10)
 
-        list_id_entry = Entry(label, textvariable=self.list_id, width=50)
+        list_id_entry = Entry(label, textvariable=self.url, width=50)
         list_id_entry.focus_set()
         list_id_entry.pack()
 
-        label = Label(frame, text='List type')
-        label.grid(row=1, column=0, sticky='w')
-
-        list_type_options = ('from url', 'playlist', 'album', 'profile')
-        self.list_type.set(list_type_options[0])
-        list_type_menu = OptionMenu(frame, self.list_type, *list_type_options)
-        list_type_menu.grid(row=1, column=1, sticky='w')
-
     def set_output_dir_frame(self, frame: Frame):
-        label = LabelFrame(frame, text='Output dir', borderwidth=0)
+        label = Label(frame, text='Output dir', borderwidth=0)
         label.grid(row=0, column=0, sticky='w')
 
-        output_dir = Entry(label, textvariable=self.output_dir, width=44)
-        output_dir.pack(side=LEFT, fill=X)
+        output_dir = Entry(frame, textvariable=self.output_dir, width=50)
+        output_dir.grid(row=1, column=0, sticky='ew', columnspan=5)
 
-        output_dir_btn = Button(label, text="pick", command=self.browse_button)
-        output_dir_btn.pack(side=LEFT)
+        output_dir_btn = Button(frame, text="pick directory", command=self.browse_button)
+        output_dir_btn.grid(row=2, column=0, sticky='ew', columnspan=5)
 
     def set_misc_frame(self, frame: Frame):
         def validate_int(value: str, acttyp: str):
@@ -93,24 +86,24 @@ class Application(Frame):
                     return False
             return True
 
+        index_label = Label(frame, text='Start index')
+        index_label.grid(row=0, column=0, sticky='w')
+
+        index_entry = Entry(frame, textvariable=self.index, validate="key")
+        index_entry['validatecommand'] = (index_entry.register(validate_int), '%P', '%d')
+        index_entry.grid(row=0, column=1, sticky='w')
+
         limit_label = Label(frame, text='Load limit')
-        limit_label.grid(row=0, column=0, sticky='w')
+        limit_label.grid(row=1, column=0, sticky='w')
 
         limit_entry = Entry(frame, textvariable=self.limit, validate="key")
         limit_entry['validatecommand'] = (limit_entry.register(validate_int), '%P', '%d')
-        limit_entry.grid(row=0, column=1, sticky='w')
-
-        index_label = Label(frame, text='Start index')
-        index_label.grid(row=1, column=0, sticky='w')
-
-        index_entry = Entry(frame, textvariable=self.index, validate="key")
-        index_entry['validatecommand'] = (limit_entry.register(validate_int), '%P', '%d')
-        index_entry.grid(row=1, column=1, sticky='w')
+        limit_entry.grid(row=1, column=1, sticky='w')
 
         format_label = Label(frame, text='Audio format')
         format_label.grid(row=2, column=0, sticky='w')
 
-        format_options = ('mp3', 'flac', 'best')
+        format_options = ('mp3', 'flac')
         self.format.set(format_options[0])
         format_menu = OptionMenu(frame, self.format, *format_options)
         format_menu.grid(row=2, column=1, sticky='w')
@@ -157,8 +150,7 @@ class Application(Frame):
         try:
             self.show_msg('starting...')
             loader = Loader(
-                list_id=self.list_id.get(),
-                list_type=self.list_type.get(),
+                urls=self.url.get(),
                 output_dir=self.output_dir.get(),
                 index=int(self.index.get()),
                 limit=int(self.limit.get()),
@@ -171,7 +163,6 @@ class Application(Frame):
             skipped = 0
             existed = 0
             for status, track, i, prog in loader.load_gen():
-                # percent = int((i + 1) / len(loader) * 100)
                 num = f'{i + 1}/{len(loader)}'
                 if status == LoadStatus.STARTING:
                     self.show_msg(f"{num} - starting...")

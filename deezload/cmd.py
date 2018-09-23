@@ -4,9 +4,10 @@ import argparse
 import logging
 import os
 
-from deezload.base import Loader, setup_logging
+from deezload.base import Loader
 from deezload.build import build_app
 from deezload.gui import start_app
+from deezload.utils import setup_logging
 
 
 logger = logging.getLogger(__name__)
@@ -14,10 +15,8 @@ logger = logging.getLogger(__name__)
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('list_id', type=str, nargs='?',
+    parser.add_argument('urls', type=str, nargs='*',
                         help='list id or resource URL')
-    parser.add_argument('-t', dest='list_type', type=str, default='playlist',
-                        help='list type')
     parser.add_argument('-i', dest='index', type=int, default=0,
                         help='start index')
     parser.add_argument('-l', dest='limit', type=int, default=50,
@@ -42,11 +41,10 @@ def main():
         build_app(args.build)
         return
 
-    if args.list_id:
+    if args.urls:
         logger.info('Fetching download links...')
         loader = Loader(
-            list_id=args.list_id,
-            list_type=args.list_type,
+            urls=args.urls,
             output_dir=args.output_dir,
             limit=args.limit,
             format=args.format,
