@@ -1,4 +1,3 @@
-import glob
 import html
 import logging
 import os
@@ -6,7 +5,7 @@ import re
 import shutil
 import sys
 from enum import Enum, auto
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 import mutagen
 import requests
@@ -23,29 +22,44 @@ class AppException(Exception):
 
 
 class LoadStatus(Enum):
-    STARTED = auto()
+    STARTING = auto()
+    SEARCHING = auto()
+    LOADING = auto()
+    MOVING = auto()
+    RESTORING_META = auto()
     FINISHED = auto()
+    EXISTED = auto()
     SKIPPED = auto()
 
 
 class Track(object):
-    def __init__(self, artist: str, title: str, album: Optional[str] = None):
+    def __init__(self, artist: str, title: str, album: str):
         self.artist = artist
         self.title = title
         self.album = album
-        self.video_id = None
-        self.checked = False
+        self.video_id: str = None
+        self.checked: bool = False
+        self.path: str = None
 
     def __str__(self):
-        return f'<track {self.video_id}: {repr(self.full_name)}>'
+        return f'<track {self.video_id}: {repr(self.short_name)}>'
 
     def __repr__(self):
         return str(self)
 
     def fetch_video_url(self):
-        self.video_id = get_video_id(self.full_name)
+        self.video_id = get_video_id(self.short_name)
         if self.video_id is None:
             logger.info("Didn't find video for track %r", self.full_name)
+
+    def set_output_path(self, output_dir: str, ext='mp3', tree=False):
+        if tree:
+            dir_path = os.path.join(output_dir, self.artist, self.album)
+            self.path = os.path.join(dir_path, f'{self.title}.{ext}')
+            return dir_path
+        else:
+            self.path = os.path.join(output_dir, f'{self.full_name}.{ext}')
+            return output_dir
 
     @property
     def valid(self):
@@ -56,12 +70,26 @@ class Track(object):
         return self.valid
 
     @property
+    def short_name(self) -> str:
+        return f'{self.artist} - {self.title}'
+
+    @property
     def full_name(self) -> str:
         return f'{self.artist} - {self.album} - {self.title}'
 
     @property
     def url(self) -> str:
         return f'http://www.youtube.com/watch?v={self.video_id}'
+
+    def restore_meta(self):
+        audio = mutagen.File(self.path, easy=True)
+        if audio is None:
+            logger.warning('failed to restore meta: %s, %s', self.path, self)
+            return
+        audio['artist'] = self.artist
+        audio['album'] = self.album
+        audio['title'] = self.title
+        audio.save()
 
 
 def deezer_url(*args, qs: Optional[dict] = None) -> str:
@@ -190,7 +218,7 @@ def get_song_name(track: dict):
 
 
 def get_ytdl_options(dir_path: str, format='mp3'):
-    if format not in ('best', 'aac', 'flac', 'mp3', 'm4a', 'opus', 'vorbis', 'wav'):
+    if format not in ('aac', 'flac', 'mp3', 'm4a', 'opus', 'vorbis', 'wav'):
         print("Bad format. Fallback to mp3")
         format = 'mp3'
     postprocessors = [{
@@ -213,43 +241,6 @@ def get_output_dir(root: str, list_name: str) -> str:
     if not os.path.exists(dir_path):
         os.mkdir(dir_path)
     return dir_path
-
-
-def tracks_in_dir(output_dir: str, track_map: Dict[str, Track]):
-    for file_path in glob.glob(os.path.join(output_dir, '*')):
-        file_name = os.path.basename(file_path)
-        video_id, file_ext = os.path.splitext(file_name)
-        track = track_map.get(video_id, None)
-        if track:
-            yield file_path, track, file_ext
-
-
-def restore_meta(output_dir: str, track_map: Dict[str, Track]):
-    logger.debug('restoring metadata...')
-    for file_path, track, file_ext in tracks_in_dir(output_dir, track_map):
-        try:
-            audio = mutagen.File(file_path)
-            audio['artist'] = track.artist
-            audio['album_artist'] = track.artist
-            audio['album'] = track.album
-            audio['title'] = track.title
-            audio.save()
-        except Exception as e:
-            logger.warning('failed to restore meta: %s, %s', file_path, track)
-            logger.warning(e)
-
-
-def fix_file_names(output_dir: str, track_map: Dict[str, Track], tree=False):
-    """Fix name and put in right directories."""
-    logger.debug('sorting files...')
-    for file_path, track, file_ext in tracks_in_dir(output_dir, track_map):
-        if tree:
-            dst_path = os.path.join(output_dir, track.artist, track.album or 'unknown album')
-            os.makedirs(dst_path, exist_ok=True)
-            dst_path = os.path.join(dst_path, track.title + file_ext)
-        else:
-            dst_path = os.path.join(output_dir, track.full_name + file_ext)
-        shutil.move(file_path, dst_path)
 
 
 class Formatter(logging.Formatter):
@@ -308,22 +299,33 @@ class Loader(object):
         options = get_ytdl_options(self.output_dir, format=self.format)
         with YoutubeDL(options) as ydl:
             for i, track in enumerate(self.tracks):
-                logger.debug('getting video id for: %s', track.full_name)
-                yield LoadStatus.STARTED, i, track
-                if not track.valid:
-                    yield LoadStatus.SKIPPED, i, track
+                yield LoadStatus.STARTING, track, i, 0
+                # check if file already loaded
+                track_dir = track.set_output_path(self.output_dir, self.format, self.tree)
+                os.makedirs(track_dir, exist_ok=True)
+                if os.path.exists(track.path):
+                    yield LoadStatus.EXISTED, track, i, 1
                     continue
+                # check if video exists
+                yield LoadStatus.SEARCHING, track, i, 0.1
+                logger.debug('getting video id for: %s', track.full_name)
+                track.fetch_video_url()
+                if not track.valid:
+                    yield LoadStatus.SKIPPED, track, i, 1
+                    continue
+                # load
+                yield LoadStatus.LOADING, track, i, 0.2
                 logger.info('Loading track: %s', track)
                 ydl.download([track.url])
-                yield LoadStatus.FINISHED, i, track
-
-        tracks_map = {
-            track.video_id: track
-            for track in self.tracks
-            if track.video_id
-        }
-        restore_meta(self.output_dir, tracks_map)
-        fix_file_names(self.output_dir, tracks_map, tree=self.tree)
+                # moving file
+                yield LoadStatus.MOVING, track, i, 0.8
+                src_path = os.path.join(self.output_dir, f'{track.video_id}.{self.format}')
+                shutil.move(src_path, track.path)
+                # restore meta data
+                yield LoadStatus.RESTORING_META, track, i, 0.9
+                track.restore_meta()
+                # fin
+                yield LoadStatus.FINISHED, track, i, 1
 
     def load(self):
         for _ in self.load_gen():

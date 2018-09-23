@@ -1,4 +1,5 @@
 import logging
+import os
 import threading
 from pathlib import Path
 from tkinter import *
@@ -30,7 +31,7 @@ class Application(Frame):
 
         self.list_id = StringVar()
         self.list_type = StringVar()
-        self.output_dir = StringVar(value=str(Path.home()))
+        self.output_dir = StringVar(value=os.path.join(str(Path.home()), 'deezload'))
         self.format = StringVar()
         self.index = StringVar(value='0')
         self.limit = StringVar(value='50')
@@ -139,9 +140,22 @@ class Application(Frame):
     def download_click(self):
         threading.Thread(target=self.download).start()
 
+    def show_msg(self, msg: str):
+        self.info_label.config(text=msg, fg='black')
+        self.info_label.update()
+
+    def show_error(self, msg: str):
+        self.info_label.config(text=msg, fg='red')
+        self.info_label.update()
+
+    def set_progress(self, val: int):
+        self.progress['value'] = val
+        self.progress.update()
+
     def download(self):
         self.download_btn.configure(state=DISABLED)
         try:
+            self.show_msg('starting...')
             loader = Loader(
                 list_id=self.list_id.get(),
                 list_type=self.list_type.get(),
@@ -151,24 +165,37 @@ class Application(Frame):
                 format=self.format.get(),
                 tree=self.use_tree.get() == '1',
             )
-            self.info_label.config(text='Starting...', fg='black')
-            self.progress['value'] = 0
+            self.set_progress(0)
             self.output_dir.set(loader.output_dir)
             self.update()
-            loaded = len(loader)
-            for status, i, track in loader.load_gen():
-                percent = int((i + 1) / len(loader) * 100)
-                if status == LoadStatus.STARTED:
-                    self.info_label.config(text=f"loaded: {i}/{len(loader)}")
-                    self.info_label.update()
+            skipped = 0
+            existed = 0
+            for status, track, i, prog in loader.load_gen():
+                # percent = int((i + 1) / len(loader) * 100)
+                num = f'{i + 1}/{len(loader)}'
+                if status == LoadStatus.STARTING:
+                    self.show_msg(f"{num} - starting...")
+                elif status == LoadStatus.SEARCHING:
+                    self.show_msg(f"{num} - searching...")
+                elif status == LoadStatus.LOADING:
+                    self.show_msg(f"{num} - loading...")
+                elif status == LoadStatus.MOVING:
+                    self.show_msg(f"{num} - moving...")
+                elif status == LoadStatus.RESTORING_META:
+                    self.show_msg(f"{num} - restoring meta data...")
+
+                elif status == LoadStatus.EXISTED:
+                    existed += 1
+                elif status == LoadStatus.SKIPPED:
+                    skipped += 1
                 elif status == LoadStatus.FINISHED:
                     logger.debug('loaded track %s', track)
-                    self.progress['value'] = percent
-                    self.progress.update()
-                elif status == LoadStatus.SKIPPED:
-                    loaded -= 1
-            self.info_label.config(text=f"done: {loaded}/{len(loader)}")
-            self.update()
+
+                self.set_progress(int((i + prog) / len(loader) * 100))
+
+            self.set_progress(100)
+            loaded = len(loader) - skipped - existed
+            self.show_msg(f"DONE. loaded: {loaded}, skipped: {skipped}, existed: {existed}")
         except Exception as e:
             logger.exception(e)
             self.info_label.config(text=str(e), fg='red')
