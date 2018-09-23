@@ -15,23 +15,42 @@
             margin-bottom: 5px;
             padding: 10px 20px;
             border-radius: .3rem;
-
         }
+
+        .message-box .left {
+            margin-right: 30px;
+        }
+
+        .message-box .right {
+            margin-left: 30px;
+        }
+
         .start-msg {
             background: rgba(72, 211, 98, 0.2);
-            margin-right: 30px;
         }
+
         .info-msg {
             background: rgba(72, 211, 98, 0.1);
-            margin-left: 30px;
         }
+
         .warn-msg {
             background: rgba(220, 255, 37, 0.1);
-            margin-left: 30px;
         }
+
+        .stop-msg {
+            background: rgba(255, 89, 59, 0.2);
+        }
+
         .final-msg {
             background: rgba(57, 129, 175, 0.2);
-            margin-right: 30px;
+        }
+
+        .error {
+            padding: 20px 0;
+            color: tomato;
+            font-size: 1.2rem;
+            font-weight: bold;
+            word-wrap: break-word;
         }
     </style>
 </head>
@@ -46,7 +65,8 @@
         <form id="main-form">
             <div class="form-group">
                 <label for="url-input">Deezer URL of playlist, artist, album or user profile</label>
-                <input name="url" type="text" class="form-control" id="url-input" placeholder="url">
+                <input name="url" type="text" class="form-control" id="url-input" placeholder="url"
+                       required>
             </div>
 
             <div class="form-row">
@@ -109,8 +129,8 @@
     let loadUrl = new URL('load', window.location.href);
     loadUrl.protocol = loadUrl.protocol.replace('http', 'ws');
     let socket = new WebSocket(loadUrl.href);
-    // let loading = false;
     let stopLoad = false;
+    let errorIsVisible = false;
 
     let mainWin = document.getElementById('main-win');
     let loadWin = document.getElementById('load-win');
@@ -119,12 +139,36 @@
     let progress = document.getElementById('progress');
     let logs = document.getElementById('logs');
 
-    // let downloadButton = document.getElementById('download-btn');
     let stopButton = document.getElementById('stop-btn');
     let finishButton = document.getElementById('finish-btn');
 
+    function setProgress(proc) {
+        proc = Math.round(proc);
+        proc = `${proc}%`;
+        progress.style.width = proc;
+        progress.textContent = proc;
+    }
+
+    function addLog(cls, msg, left = true) {
+        let lastMaxScroll = logs.scrollHeight - logs.offsetHeight;
+        let side = left ? 'left' : 'right';
+        logs.innerHTML += `<div class="${cls} ${side}">${msg}</div>`;
+        // scroll more if at the bottom
+        if (logs.scrollTop === lastMaxScroll) {
+            logs.scrollTop = logs.scrollHeight;
+        }
+    }
+
+    function removeError() {
+        if (errorIsVisible) {
+            mainWin.removeChild(mainWin.lastChild);
+            errorIsVisible = false;
+            console.log('remove');
+        }
+    }
+
     stopButton.onclick = function () {
-        // todo: show alert
+        addLog('stop-msg', 'wait till one more audio file loads before stop', true);
         stopLoad = true;
         socket.send(JSON.stringify({
             'type': 'stop',
@@ -142,6 +186,7 @@
 
     mainForm.onsubmit = function (event) {
         event.preventDefault();
+        removeError();
         let formData = new FormData(mainForm);
         let data = {
             'type': 'start',
@@ -154,39 +199,30 @@
         socket.send(JSON.stringify(data));
     };
 
-    function setProgress (proc) {
-        proc = Math.round(proc);
-        proc = `${proc}%`;
-        progress.style.width = proc;
-        progress.textContent = proc;
-    }
-
     socket.onmessage = function (event) {
         let data = JSON.parse(event.data);
-        console.log('GOT');
-        console.log(data);
 
         if (data.type === 'status') {
-            let lastMaxScroll = logs.scrollHeight - logs.offsetHeight;
             if (data.status === 'starting') {
-                logs.innerHTML += `<div class="start-msg">${data.message}</div>`;
+                addLog('start-msg', data.message, true);
             }
-            else if (data.status === 'skipped'){
-                logs.innerHTML += `<div class="warn-msg">${data.message}</div>`;
+            else if (data.status === 'skipped') {
+                addLog('warn-msg', data.message, false);
             }
             else {
-                logs.innerHTML += `<div class="info-msg">${data.message}</div>`;
-            }
-            // scroll more if at the bottom
-            if (logs.scrollTop === lastMaxScroll) {
-                logs.scrollTop = logs.scrollHeight;
+                addLog('info-msg', data.message, false);
             }
 
             let proc = (data.index + data.prog) / data.size * 100;
             setProgress(proc);
 
         } else if (data.type === 'error') {
-            // todo: show alert
+            removeError();
+            errorIsVisible = true;
+            let error = document.createElement('div');
+            error.classList.add('error');
+            error.innerText = data.message;
+            mainWin.appendChild(error);
 
         } else if (data.type === 'start') {
             mainWin.style.display = 'none';
@@ -196,12 +232,10 @@
             finishButton.style.display = 'block';
             stopButton.style.display = 'none';
 
-            logs.innerHTML += `
-<div class="final-msg">
-    <div>loaded: ${data.loaded}</div>
-    <div>existed: ${data.existed}</div>
-    <div>skipped: ${data.skipped}</div>
-</div>`;
+            let msg = `<div>loaded: ${data.loaded}</div>
+                       <div>existed: ${data.existed}</div>
+                       <div>skipped: ${data.skipped}</div>`;
+            addLog('final-msg', msg);
         }
 
         socket.send(JSON.stringify({
