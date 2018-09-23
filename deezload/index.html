@@ -29,12 +29,16 @@
             background: rgba(220, 255, 37, 0.1);
             margin-left: 30px;
         }
+        .final-msg {
+            background: rgba(57, 129, 175, 0.2);
+            margin-right: 30px;
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div class="jumbotron">
+    <div class="jumbotron" style="padding: 2rem 1rem; margin-top: 20px">
         <h1 class="display-4" style="text-align: center">deezload</h1>
     </div>
 
@@ -87,7 +91,7 @@
         <div class="progress" style="margin-bottom: 20px">
             <div id="progress" class="progress-bar" role="progressbar" style="width: 0;"></div>
         </div>
-        <div id="logs" class="message-box" style="overflow-y: scroll; height:360px;">
+        <div id="logs" class="message-box" style="overflow-y: scroll; height: 400px;">
         </div>
         <button type="button" class="btn btn-danger btn-lg btn-block" id="stop-btn"
                 style="margin-top: 20px">
@@ -122,6 +126,9 @@
     stopButton.onclick = function () {
         // todo: show alert
         stopLoad = true;
+        socket.send(JSON.stringify({
+            'type': 'stop',
+        }));
     };
 
     finishButton.onclick = function () {
@@ -130,6 +137,7 @@
         finishButton.style.display = 'none';
         stopButton.style.display = 'block';
         logs.innerHTML = '';
+        setProgress(0);
     };
 
     mainForm.onsubmit = function (event) {
@@ -146,12 +154,20 @@
         socket.send(JSON.stringify(data));
     };
 
+    function setProgress (proc) {
+        proc = Math.round(proc);
+        proc = `${proc}%`;
+        progress.style.width = proc;
+        progress.textContent = proc;
+    }
+
     socket.onmessage = function (event) {
         let data = JSON.parse(event.data);
         console.log('GOT');
         console.log(data);
 
         if (data.type === 'status') {
+            let lastMaxScroll = logs.scrollHeight - logs.offsetHeight;
             if (data.status === 'starting') {
                 logs.innerHTML += `<div class="start-msg">${data.message}</div>`;
             }
@@ -161,12 +177,13 @@
             else {
                 logs.innerHTML += `<div class="info-msg">${data.message}</div>`;
             }
+            // scroll more if at the bottom
+            if (logs.scrollTop === lastMaxScroll) {
+                logs.scrollTop = logs.scrollHeight;
+            }
 
             let proc = (data.index + data.prog) / data.size * 100;
-            proc = Math.round(proc);
-            proc = `${proc}%`;
-            progress.style.width = proc;
-            progress.textContent = proc;
+            setProgress(proc);
 
         } else if (data.type === 'error') {
             // todo: show alert
@@ -178,6 +195,13 @@
         } else if (data.type === 'complete') {
             finishButton.style.display = 'block';
             stopButton.style.display = 'none';
+
+            logs.innerHTML += `
+<div class="final-msg">
+    <div>loaded: ${data.loaded}</div>
+    <div>existed: ${data.existed}</div>
+    <div>skipped: ${data.skipped}</div>
+</div>`;
         }
 
         socket.send(JSON.stringify({

@@ -14,10 +14,14 @@ app = Sanic()
 logger = logging.getLogger(__name__)
 
 
+async def recv(ws: WebSocket):
+    data = await ws.recv()
+    return json.loads(data)
+
+
 async def load_cycle(ws: WebSocket):
     while True:
-        data = await ws.recv()
-        data = json.loads(data)
+        data = await recv(ws)
 
         try:
             loader = Loader(
@@ -46,6 +50,8 @@ async def load_cycle(ws: WebSocket):
     }))
     await ws.recv()
 
+    should_stop = False
+    loaded, existed, skipped = 0, 0, 0
     for status, track, i, prog in loader.load_gen():
         if status == LoadStatus.STARTING:
             message = track.short_name
@@ -59,10 +65,13 @@ async def load_cycle(ws: WebSocket):
             message = "restoring file meta data..."
 
         elif status == LoadStatus.SKIPPED:
-            message = "⚠️ wasn't able to find track"
+            message = "wasn't able to find track"
+            skipped += 1
         elif status == LoadStatus.EXISTED:
             message = f"track already exists at {track.path}"
+            existed += 1
         elif status == LoadStatus.FINISHED:
+            loaded += 1
             message = "done!"
         else:
             message = None
@@ -75,12 +84,19 @@ async def load_cycle(ws: WebSocket):
                 'prog': prog,
                 'size': len(loader)
             }))
-            resp = await ws.recv()
-            if resp == 'stop':
-                break
+            resp = await recv(ws)
+            if resp['type'] == 'stop':
+                should_stop = True
+
+        if should_stop and status in LoadStatus.finite_states():
+            break
+
     await ws.send(json.dumps({
         'type': 'complete',
         'message': 'ok',
+        'loaded': loaded,
+        'existed': existed,
+        'skipped': skipped,
     }))
     await ws.recv()
 
