@@ -4,6 +4,7 @@ import os
 import re
 import shutil
 from enum import Enum, auto
+from pathlib import Path
 from typing import List, NamedTuple, Optional, Union
 
 import mutagen
@@ -49,15 +50,21 @@ class Track(object):
     def fetch_video_url(self):
         self.video_id = get_video_id(self.short_name)
         if self.video_id is None:
-            logger.info("Didn't find video for track %r", self.full_name)
+            logger.debug("Didn't find video for track %r", self.short_name)
+
+    def pf(self, s: str):
+        """make string path-friendly"""
+        return s.replace(os.sep, '|')
 
     def set_output_path(self, output_dir: str, ext='mp3', tree=False):
         if tree:
-            dir_path = os.path.join(output_dir, self.artist, self.album)
-            self.path = os.path.join(dir_path, f'{self.title}.{ext}')
+            dir_path = os.path.join(output_dir, self.pf(self.artist), self.pf(self.album))
+            name = self.pf(self.title)
+            self.path = os.path.join(dir_path, f'{name}.{ext}')
             return dir_path
         else:
-            self.path = os.path.join(output_dir, f'{self.full_name}.{ext}')
+            name = self.pf(self.full_name)
+            self.path = os.path.join(output_dir, f'{name}.{ext}')
             return output_dir
 
     @property
@@ -165,6 +172,7 @@ def get_user(url: str) -> str:
 
 
 def get_tracks(url: str, index=0, limit=50) -> Playlist:
+    logger.info('💎 Fetching tracks from %s', url)
     api_url = build_api_url(url, index, limit)
 
     logger.debug(api_url)
@@ -226,7 +234,7 @@ def extract_video_id(qs: str) -> Optional[str]:
             if name == 'v':
                 return value
     except Exception as e:
-        print(e)
+        logger.exception(e)
     return
 
 
@@ -247,7 +255,7 @@ def get_song_name(track: dict):
 
 def get_ytdl_options(dir_path: str, format='mp3'):
     if format not in ('aac', 'flac', 'mp3', 'm4a', 'opus', 'vorbis', 'wav'):
-        print("Bad format. Fallback to mp3")
+        logger.warning("Bad format. Fallback to mp3")
         format = 'mp3'
     postprocessors = [{
         'key': 'FFmpegExtractAudio',
@@ -264,11 +272,20 @@ def get_ytdl_options(dir_path: str, format='mp3'):
     return options
 
 
-def get_output_dir(root: str, list_name: str) -> str:
-    dir_path = os.path.join(root, list_name)
-    if not os.path.exists(dir_path):
-        os.mkdir(dir_path)
-    return dir_path
+class PlaylistWriter(object):
+    def __init__(self, output_dir: str, name: Optional[str]):
+        self.file = None
+        if name:
+            path = os.path.join(output_dir, f'{name}.m3u')
+            self.file = open(path, 'w')
+
+    def write(self, song_path: str):
+        if self.file:
+            self.file.write(song_path + '\n')
+
+    def close(self):
+        if self.file:
+            self.file.close()
 
 
 class Loader(object):
@@ -279,12 +296,13 @@ class Loader(object):
         self.format = format
         self.tree = tree
 
+        # playlist generator
         self.playlists = [
             get_tracks(url, index, limit)
             for url in urls
         ]
 
-        output_dir = output_dir or get_output_dir(os.getcwd(), 'deezload_result')
+        output_dir = output_dir or os.path.join(str(Path.home()), 'deezload')
         self.output_dir = os.path.abspath(output_dir)
         os.makedirs(self.output_dir, exist_ok=True)
         logger.debug('output dir: %s', self.output_dir)
@@ -303,14 +321,12 @@ class Loader(object):
                 continue
             # check if video exists
             yield LoadStatus.SEARCHING, track, i, 0.1
-            logger.debug('getting video id for: %s', track.full_name)
             track.fetch_video_url()
             if not track.valid:
                 yield LoadStatus.SKIPPED, track, i, 1
                 continue
             # load
             yield LoadStatus.LOADING, track, i, 0.2
-            logger.info('Loading track: %s', track)
             ydl.download([track.url])
             # moving file
             yield LoadStatus.MOVING, track, i, 0.8
@@ -325,12 +341,33 @@ class Loader(object):
     def load_gen(self):
         options = get_ytdl_options(self.output_dir, format=self.format)
         with YoutubeDL(options) as ydl:
+            last_index = 0
             for playlist in self.playlists:
-                for track in self.load_tracks(ydl, playlist.tracks):
-                    yield track
-                # save playlist
-                # print('SAVING PLAYLIST', playlist.name)
+                pw = PlaylistWriter(self.output_dir, playlist.name)
+                for status, track, i, prog in self.load_tracks(ydl, playlist.tracks):
+                    if status in (LoadStatus.FINISHED, LoadStatus.EXISTED):
+                        pw.write(track.path)
+
+                    yield status, track, last_index + i, prog
+                last_index = len(playlist.tracks)
+                pw.close()
 
     def load(self):
-        for _ in self.load_gen():
-            pass
+        for status, track, i, prog in self.load_gen():
+            if status == LoadStatus.STARTING:
+                logger.info("🔥 starting loading: %r", track)
+            elif status == LoadStatus.SEARCHING:
+                logger.info("\tsearching for video...")
+            elif status == LoadStatus.LOADING:
+                logger.info("\tloading audio...")
+            elif status == LoadStatus.MOVING:
+                logger.info("\tmoving file...")
+            elif status == LoadStatus.RESTORING_META:
+                logger.info("\trestoring file meta data...")
+
+            elif status == LoadStatus.SKIPPED:
+                logger.info("\t⚠️ wasn't able to find track")
+            elif status == LoadStatus.EXISTED:
+                logger.info("\ttrack already exists at %s", track.path)
+            elif status == LoadStatus.FINISHED:
+                logger.info("\tdone!")

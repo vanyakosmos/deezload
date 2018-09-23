@@ -24,11 +24,11 @@ def main():
     parser.add_argument('-d', dest='debug', action='store_true',
                         help='debug mode')
     parser.add_argument('-o', dest='output_dir', type=str,
-                        help='output directory')
+                        help='output directory (default HOME/deezload)')
     parser.add_argument('-f', dest='format', type=str, default='mp3',
-                        help='output audio file format')
-    parser.add_argument('--tree', action='store_true',
-                        help='save files as tree: artist/album/song')
+                        help='output audio file format (default mp3)')
+    parser.add_argument('--tree', action='store_false',
+                        help='save files as tree: artist/album/song (default true)')
     parser.add_argument('--build', type=str, default=None,
                         help='build output path')
 
@@ -42,7 +42,6 @@ def main():
         return
 
     if args.urls:
-        logger.info('Fetching download links...')
         loader = Loader(
             urls=args.urls,
             output_dir=args.output_dir,
