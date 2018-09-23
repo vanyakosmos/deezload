@@ -31,6 +31,9 @@ class LoadStatus(Enum):
     EXISTED = auto()
     SKIPPED = auto()
 
+    def __str__(self):
+        return self._name_.lower()
+
     @staticmethod
     def finite_states():
         return LoadStatus.FINISHED, LoadStatus.EXISTED, LoadStatus.SKIPPED
@@ -179,13 +182,16 @@ def get_tracks(url: str, index=0, limit=50) -> Playlist:
     logger.info('💎 Fetching tracks from %s', url)
     api_url = build_api_url(url, index, limit)
 
+    if api_url is None:
+        raise AppException(f"Bad url: {url}")
+
     logger.debug(api_url)
     res = requests.get(api_url.url)
     logger.debug('load status %s', res.status_code)
     data = res.json()
     if res.status_code != 200 or 'error' in data:
         logger.error(data)
-        raise AppException(f"Bad url: {url}")
+        raise AppException(f"Couldn't fetch data: {url}")
 
     if api_url.type == 'album':
         artist = data['artist']['name']
@@ -300,11 +306,11 @@ class Loader(object):
         self.format = format
         self.tree = tree
 
-        # playlist generator
         self.playlists = [
             get_tracks(url, index, limit)
             for url in urls
         ]
+        self.size = sum(map(len, (p.tracks for p in self.playlists)))
 
         output_dir = output_dir or os.path.join(str(Path.home()), 'deezload')
         self.output_dir = os.path.abspath(output_dir)
@@ -312,7 +318,7 @@ class Loader(object):
         logger.debug('output dir: %s', self.output_dir)
 
     def __len__(self):
-        return sum(map(len, (p.tracks for p in self.playlists)))
+        return self.size
 
     def load_tracks(self, ydl: YoutubeDL, tracks: List[Track]):
         for i, track in enumerate(tracks):

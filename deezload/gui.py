@@ -16,8 +16,7 @@ logger = logging.getLogger(__name__)
 class Application(Frame):
     def __init__(self, master=None, *args, **kwargs):
         """
-        list_id - text
-        list_type - select
+        urls - text
         output_dir - dir picker
         limit - num field
         format - select

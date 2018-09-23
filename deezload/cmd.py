@@ -2,11 +2,11 @@
 
 import argparse
 import logging
-import os
 
 from deezload.base import Loader
 from deezload.build import build_app
 from deezload.gui import start_app
+from deezload.settings import DEBUG
 from deezload.utils import setup_logging
 
 
@@ -33,7 +33,7 @@ def main():
                         help='build output path')
 
     args = parser.parse_args()
-    debug = args.debug or os.environ.get('DEBUG') == '1'
+    debug = args.debug or DEBUG
     setup_logging(debug)
     logger.debug('args: %s', args)
 
