@@ -107,3 +107,4 @@ venv.bak/
 
 output
 playground.py
+!deezload/build_mac.spec

@@ -3,38 +3,13 @@
 import argparse
 import logging
 import os
-import subprocess
-import sys
 
 from deezload.base import Loader, setup_logging
+from deezload.build import build_app
 from deezload.gui import start_app
 
 
 logger = logging.getLogger(__name__)
-
-
-def build_app(output_dir: str):
-    output_dir = os.path.abspath(output_dir or '.')
-    os.makedirs(output_dir, exist_ok=True)
-    dist_path = os.path.join(output_dir, 'dist')
-    build_path = os.path.join(output_dir, 'build')
-
-    package_root = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-    icon_name = 'icon.icns' if sys.platform == 'darwin' else 'icon.ico'
-    icon_path = os.path.join(package_root, 'deezload', icon_name)
-    cmd_path = os.path.join(package_root, 'deezload', 'cmd.py')
-
-    subprocess.run([
-        'pyinstaller',
-        f'--paths={package_root}',
-        '--onefile', '--windowed',
-        '--name', 'deezload',
-        f'--icon={icon_path}',
-        '--distpath', dist_path,
-        '--workpath', build_path,
-        '--noconsole',
-        cmd_path,
-    ])
 
 
 def main():
