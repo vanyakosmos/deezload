@@ -35,11 +35,14 @@ class Application(Frame):
         self.format = StringVar()
         self.index = StringVar(value='0')
         self.limit = StringVar(value='50')
-        self.use_tree = StringVar(value='0')
+        self.use_tree = StringVar(value='1')
         self.logs_var = StringVar(value='foo')
+        self.should_stop = False
 
         self.download_btn: Button = None
+        self.stop_btn: Button = None
         self.info_label: Label = None
+        self.error_label: Label = None
         self.progress: Progressbar = None
 
         list_params_frame = Frame(self, width=400)
@@ -58,16 +61,16 @@ class Application(Frame):
         download_frame.grid(row=3, sticky='ew')
 
     def set_list_params_frame(self, frame: Frame):
-        label = LabelFrame(frame, text='Deezer URL of playlist, artist, album or user profile',
-                           borderwidth=0)
-        label.grid(row=0, column=0, sticky='w', columnspan=10)
+        label = Label(frame, text='Deezer URL of playlist, artist, album or user profile',
+                      font='Helvetica 14 bold')
+        label.grid(row=0, column=0, sticky='w')
 
-        list_id_entry = Entry(label, textvariable=self.url, width=50)
+        list_id_entry = Entry(frame, textvariable=self.url, width=50)
         list_id_entry.focus_set()
-        list_id_entry.pack()
+        list_id_entry.grid(row=1, column=0, sticky='ew', columnspan=5)
 
     def set_output_dir_frame(self, frame: Frame):
-        label = Label(frame, text='Output dir', borderwidth=0)
+        label = Label(frame, text='Output dir', font='Helvetica 14 bold')
         label.grid(row=0, column=0, sticky='w')
 
         output_dir = Entry(frame, textvariable=self.output_dir, width=50)
@@ -114,16 +117,21 @@ class Application(Frame):
         tree_checkbox.grid(row=3, column=0, sticky='w', columnspan=2)
 
     def set_download_frame(self, frame: Frame):
-        self.download_btn = Button(frame, text='Download', width=48,
+        self.download_btn = Button(frame, text='Download', width=24,
                                    command=self.download_click)
         self.download_btn.grid(row=0, sticky='ew')
-
-        self.info_label = Label(frame, font='Helvetica 14 bold')
-        self.info_label.grid(row=1, sticky='ew', pady=5)
+        self.stop_btn = Button(frame, text='Stop', width=24,
+                               command=self.stop_work, state=DISABLED)
+        self.stop_btn.grid(row=0, column=1, sticky='ew')
 
         self.progress = Progressbar(frame, orient="horizontal", value=0,
                                     style="red.Horizontal.TProgressbar")
-        self.progress.grid(row=2, sticky='ew')
+        self.progress.grid(row=1, sticky='ew', columnspan=2)
+
+        self.info_label = Label(frame, font='Helvetica 14 bold')
+        self.info_label.grid(row=2, sticky='ew', columnspan=2, pady=5)
+        self.error_label = Label(frame, font='Helvetica 14 bold', fg='red')
+        self.error_label.grid(row=3, sticky='ew', columnspan=2, pady=5)
 
     def browse_button(self):
         filename = filedialog.askdirectory()
@@ -131,24 +139,30 @@ class Application(Frame):
             self.output_dir.set(filename)
 
     def download_click(self):
+        self.download_btn.configure(state=DISABLED)
+        self.stop_btn.configure(state=NORMAL)
         threading.Thread(target=self.download).start()
 
+    def stop_work(self):
+        self.should_stop = True
+        self.show_error('waiting for one last song to load before stop...')
+        self.stop_btn.configure(state=DISABLED)
+
     def show_msg(self, msg: str):
-        self.info_label.config(text=msg, fg='black')
+        self.info_label.config(text=msg)
         self.info_label.update()
 
     def show_error(self, msg: str):
-        self.info_label.config(text=msg, fg='red')
-        self.info_label.update()
+        self.error_label.config(text=msg)
+        self.error_label.update()
 
     def set_progress(self, val: int):
         self.progress['value'] = val
         self.progress.update()
 
     def download(self):
-        self.download_btn.configure(state=DISABLED)
         try:
-            self.show_msg('starting...')
+            self.show_msg('loading tracks...')
             loader = Loader(
                 urls=self.url.get(),
                 output_dir=self.output_dir.get(),
@@ -160,32 +174,36 @@ class Application(Frame):
             self.set_progress(0)
             self.output_dir.set(loader.output_dir)
             self.update()
+            loaded = 0
             skipped = 0
             existed = 0
             for status, track, i, prog in loader.load_gen():
                 num = f'{i + 1}/{len(loader)}'
                 if status == LoadStatus.STARTING:
-                    self.show_msg(f"{num} - starting...")
+                    self.show_msg(f"{num} - init")
                 elif status == LoadStatus.SEARCHING:
-                    self.show_msg(f"{num} - searching...")
+                    self.show_msg(f"{num} - searching for video")
                 elif status == LoadStatus.LOADING:
-                    self.show_msg(f"{num} - loading...")
+                    self.show_msg(f"{num} - loading video")
                 elif status == LoadStatus.MOVING:
-                    self.show_msg(f"{num} - moving...")
+                    self.show_msg(f"{num} - moving file")
                 elif status == LoadStatus.RESTORING_META:
-                    self.show_msg(f"{num} - restoring meta data...")
+                    self.show_msg(f"{num} - restoring audio meta data")
 
                 elif status == LoadStatus.EXISTED:
                     existed += 1
                 elif status == LoadStatus.SKIPPED:
                     skipped += 1
                 elif status == LoadStatus.FINISHED:
+                    loaded += 1
                     logger.debug('loaded track %s', track)
 
                 self.set_progress(int((i + prog) / len(loader) * 100))
 
+                if self.should_stop and status in LoadStatus.finite_states():
+                    break
+
             self.set_progress(100)
-            loaded = len(loader) - skipped - existed
             self.show_msg(f"DONE. loaded: {loaded}, skipped: {skipped}, existed: {existed}")
         except Exception as e:
             logger.exception(e)
@@ -193,6 +211,9 @@ class Application(Frame):
             self.info_label.update()
         finally:
             self.download_btn.configure(state=NORMAL)
+            self.stop_btn.configure(state=DISABLED)
+            self.should_stop = False
+            self.show_error('')
 
 
 def center(win, width=None, height=None):

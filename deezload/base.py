@@ -31,6 +31,10 @@ class LoadStatus(Enum):
     EXISTED = auto()
     SKIPPED = auto()
 
+    @staticmethod
+    def finite_states():
+        return LoadStatus.FINISHED, LoadStatus.EXISTED, LoadStatus.SKIPPED
+
 
 class Track(object):
     def __init__(self, artist: str, title: str, album: str):
