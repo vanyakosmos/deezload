@@ -42,7 +42,7 @@ pip install git+https://github.com/vanyakosmos/deezload
 
 install ffmpeg (or avconv) on os x:
 ```bash
-brew search ffmpeg
+brew install ffmpeg
 ```
 for another systems [check out here](https://github.com/adaptlearning/adapt_authoring/wiki/Installing-FFmpeg) or [here](https://duckduckgo.com/?q=install+ffmpeg)
 
