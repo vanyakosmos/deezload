@@ -61,9 +61,14 @@ class Track(object):
 
     def pf(self, s: str):
         """make string path-friendly"""
-        return s.replace(os.sep, '|')
+        s = s.replace(os.sep, '|')
+        s = s.replace('/', '|')
+        return s
 
-    def set_output_path(self, output_dir: str, ext='mp3', tree=False):
+    def set_output_path(self, output_dir: str, ext='mp3', tree=False) -> str:
+        """
+        Should return absolute path to track's basedir.
+        """
         if tree:
             dir_path = os.path.join(output_dir, self.pf(self.artist), self.pf(self.album))
             name = self.pf(self.title)
@@ -287,12 +292,15 @@ def get_ytdl_options(dir_path: str, format='mp3'):
 class PlaylistWriter(object):
     def __init__(self, output_dir: str, name: Optional[str]):
         self.file = None
+        self.output_dir = output_dir
         if name:
             path = os.path.join(output_dir, f'{name}.m3u')
             self.file = open(path, 'w')
 
     def write(self, song_path: str):
         if self.file:
+            song_path = os.path.relpath(song_path, self.output_dir)
+            song_path = '/'.join(song_path.split(os.sep))
             self.file.write(song_path + '\n')
 
     def close(self):
