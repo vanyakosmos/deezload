@@ -108,3 +108,7 @@ venv.bak/
 screenshots
 .git
 output
+README.md
+LICENSE
+setup.py
+upload
