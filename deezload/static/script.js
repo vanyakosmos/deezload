@@ -11,6 +11,7 @@ let mainForm = document.getElementById('main-form');
 let progress = document.getElementById('progress');
 let logs = document.getElementById('logs');
 
+let downloadButton = document.getElementById('download-btn');
 let stopButton = document.getElementById('stop-btn');
 let finishButton = document.getElementById('finish-btn');
 
@@ -50,11 +51,13 @@ finishButton.onclick = function () {
     stopButton.style.display = 'block';
     logs.innerHTML = '';
     stopLoad = false;
+    downloadButton.disabled = false;
     setProgress(0);
 };
 
 mainForm.onsubmit = function (event) {
     event.preventDefault();
+    downloadButton.disabled = true;
     removeError();
     let formData = new FormData(mainForm);
     let data = {
@@ -85,6 +88,14 @@ socket.onmessage = function (event) {
         let proc = (data.index + data.prog) / data.size * 100;
         setProgress(proc);
 
+        let respType = 'ok';
+        if (stopLoad) {
+            respType = 'stop';
+        }
+        socket.send(JSON.stringify({
+            'type': respType,
+        }));
+
     } else if (data.type === 'error') {
         removeError();
         errorIsVisible = true;
@@ -92,6 +103,7 @@ socket.onmessage = function (event) {
         error.classList.add('error');
         error.innerText = data.message;
         mainWin.appendChild(error);
+        downloadButton.disabled = false;
 
     } else if (data.type === 'start') {
         mainWin.style.display = 'none';
@@ -102,15 +114,8 @@ socket.onmessage = function (event) {
         stopButton.style.display = 'none';
 
         let msg = `<div>loaded: ${data.loaded}</div>
-                       <div>existed: ${data.existed}</div>
-                       <div>skipped: ${data.skipped}</div>`;
+                   <div>existed: ${data.existed}</div>
+                   <div>skipped: ${data.skipped}</div>`;
         addLog('final-msg', msg);
     }
-    let respType = 'ok';
-    if (stopLoad) {
-        respType = 'stop';
-    }
-    socket.send(JSON.stringify({
-        'type': respType,
-    }));
 };

@@ -38,15 +38,15 @@ async def load_cycle(ws: WebSocket):
             'type': 'start',
             'message': 'ok',
         }))
-        await ws.recv()
+
     except AppException as e:
         logger.warning(e)
         await ws.send(json.dumps({
             'type': 'error',
             'message': str(e),
         }))
-        await ws.recv()
         return
+
     except Exception as e:
         logger.exception(e)
         return
@@ -76,6 +76,7 @@ async def load_cycle(ws: WebSocket):
             message = "done!"
         else:
             message = None
+
         if message:
             await ws.send(json.dumps({
                 'type': 'status',
@@ -99,7 +100,6 @@ async def load_cycle(ws: WebSocket):
         'existed': existed,
         'skipped': skipped,
     }))
-    await ws.recv()
 
 
 @app.websocket('/load')
