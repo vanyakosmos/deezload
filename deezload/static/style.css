@@ -1,0 +1,41 @@
+.message-box > div {
+    margin-bottom: 5px;
+    padding: 10px 20px;
+    border-radius: .3rem;
+}
+
+.message-box .left {
+    margin-right: 30px;
+}
+
+.message-box .right {
+    margin-left: 30px;
+}
+
+.start-msg {
+    background: rgba(72, 211, 98, 0.2);
+}
+
+.info-msg {
+    background: rgba(72, 211, 98, 0.1);
+}
+
+.warn-msg {
+    background: rgba(220, 255, 37, 0.1);
+}
+
+.stop-msg {
+    background: rgba(255, 89, 59, 0.2);
+}
+
+.final-msg {
+    background: rgba(57, 129, 175, 0.2);
+}
+
+.error {
+    padding: 20px 0;
+    color: tomato;
+    font-size: 1.2rem;
+    font-weight: bold;
+    word-wrap: break-word;
+}

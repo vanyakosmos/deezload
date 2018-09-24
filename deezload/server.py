@@ -7,48 +7,49 @@ from sanic.response import html
 from sanic.websocket import WebSocketCommonProtocol as WebSocket
 
 from deezload.base import AppException, LoadStatus, Loader
-from deezload.settings import DEBUG
 
 
 app = Sanic()
+app.static('/static', './static')
 logger = logging.getLogger(__name__)
 
 
-async def recv(ws: WebSocket):
+async def recv(ws: WebSocket) -> dict:
     data = await ws.recv()
-    return json.loads(data)
+    data = json.loads(data)
+    return data
 
 
 async def load_cycle(ws: WebSocket):
-    while True:
-        data = await recv(ws)
+    data = await recv(ws)
+    if data['type'] != 'start':
+        return
 
-        try:
-            loader = Loader(
-                urls=data.get('url'),
-                output_dir='../output',
-                index=data.get('index'),
-                limit=data.get('limit'),
-                format=data.get('format'),
-                tree=data.get('tree'),
-            )
-            break
-        except AppException as e:
-            logger.warning(e)
-            await ws.send(json.dumps({
-                'type': 'error',
-                'message': str(e),
-            }))
-            await ws.recv()
-        except Exception as e:
-            logger.exception(e)
-            return
-
-    await ws.send(json.dumps({
-        'type': 'start',
-        'message': 'ok',
-    }))
-    await ws.recv()
+    try:
+        loader = Loader(
+            urls=data.get('url'),
+            output_dir='../output',
+            index=data.get('index'),
+            limit=data.get('limit'),
+            format=data.get('format'),
+            tree=data.get('tree'),
+        )
+        await ws.send(json.dumps({
+            'type': 'start',
+            'message': 'ok',
+        }))
+        await ws.recv()
+    except AppException as e:
+        logger.warning(e)
+        await ws.send(json.dumps({
+            'type': 'error',
+            'message': str(e),
+        }))
+        await ws.recv()
+        return
+    except Exception as e:
+        logger.exception(e)
+        return
 
     should_stop = False
     loaded, existed, skipped = 0, 0, 0
@@ -104,7 +105,7 @@ async def load_cycle(ws: WebSocket):
 @app.websocket('/load')
 async def load(_: Request, ws: WebSocket):
     while True:
-        print('NEW CYCLE')
+        logger.info('♻️ NEW CYCLE ♻️')
         await load_cycle(ws)
 
 
@@ -113,5 +114,5 @@ async def index(_):
     return html(open('index.html').read())
 
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000, debug=DEBUG)
+def start_server(debug=False):
+    app.run(host="0.0.0.0", port=8000, debug=debug)

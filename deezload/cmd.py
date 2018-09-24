@@ -6,7 +6,8 @@ import logging
 from deezload.base import Loader
 from deezload.build import build_app
 from deezload.gui import start_app
-from deezload.settings import DEBUG
+from deezload.server import start_server
+from deezload.settings import DEBUG, UI_TYPE
 from deezload.utils import setup_logging
 
 
@@ -27,8 +28,10 @@ def main():
                         help='output directory (default HOME/deezload)')
     parser.add_argument('-f', dest='format', type=str, default='mp3',
                         help='output audio file format (default mp3)')
-    parser.add_argument('--tree', action='store_false',
-                        help='save files as tree: artist/album/song (default true)')
+    parser.add_argument('--tree', action='store_true',
+                        help='save files as tree: artist/album/song (default false)')
+    parser.add_argument('--web', action='store_true',
+                        help='run web server (default false)')
     parser.add_argument('--build', type=str, default=None,
                         help='build output path')
 
@@ -50,6 +53,8 @@ def main():
             tree=args.tree,
         )
         loader.load()
+    elif args.web or UI_TYPE == 'web':
+        start_server(debug)
     else:
         start_app()
 

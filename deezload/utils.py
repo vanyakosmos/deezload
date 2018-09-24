@@ -31,7 +31,7 @@ def setup_logging(debug=False, stream=None):
     handler.setFormatter(Formatter())
     logging.basicConfig(level=logging.DEBUG if debug else logging.INFO,
                         handlers=[handler])
-    for module in ('urllib3', 'eyed3', 'youtube_dl'):
+    for module in ('urllib3', 'eyed3', 'youtube_dl', 'sanic'):
         logging.getLogger(module).setLevel(logging.WARNING)
     if debug:
         logging.getLogger('youtube_dl').setLevel(logging.DEBUG)

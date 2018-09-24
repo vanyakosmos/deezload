@@ -12,7 +12,7 @@ block_cipher = None
 spec_path = os.path.abspath(SPECPATH)
 package_root = os.path.dirname(spec_path)
 icon_name = 'icon.icns' if sys.platform == 'darwin' else 'icon.ico'
-icon_path = os.path.join(package_root, 'deezload', icon_name)
+icon_path = os.path.join(package_root, 'deezload', 'static', icon_name)
 cmd_path = os.path.join(package_root, 'deezload', 'cmd.py')
 print('package_root:', package_root)
 print('icon_path:', icon_path)
