@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name='deezload',
-    version='0.2.3',
+    version='0.2.4',
     packages=['deezload'],
     include_package_data=True,
     url='https://github.com/vanyakosmos/deezload',
@@ -13,7 +13,7 @@ setup(
     description='Song downloading from deezer.',
     install_requires=['mutagen', 'youtube_dl', 'requests', 'sanic'],
     extras_require={
-        "pyinstaller": ["pyinstaller"],
+        'pyinstaller': ['pyinstaller'],
     },
     entry_points={
         'console_scripts': [

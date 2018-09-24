@@ -5,6 +5,7 @@ import re
 import shutil
 from enum import Enum, auto
 from typing import List, NamedTuple, Optional, Union
+from urllib.parse import parse_qs, urlencode
 
 import mutagen
 import requests
@@ -66,14 +67,20 @@ class Track(object):
         s = s.replace('/', '|')
         return s
 
+    def pf_bulk(self, *args):
+        return [
+            self.pf(a)
+            for a in args
+        ]
+
     def set_output_path(self, output_dir: str, ext='mp3', tree=False) -> str:
         """
         Should return absolute path to track's basedir.
         """
         if tree:
-            dir_path = os.path.join(output_dir, self.pf(self.artist), self.pf(self.album))
-            name = self.pf(self.title)
-            self.path = os.path.join(dir_path, f'{name}.{ext}')
+            artist, album, title = self.pf_bulk(self.artist, self.album, self.title)
+            dir_path = os.path.join(output_dir, artist, album)
+            self.path = os.path.join(dir_path, f'{title}.{ext}')
             return dir_path
         else:
             name = self.pf(self.full_name)
@@ -123,24 +130,10 @@ class Playlist(NamedTuple):
 
 def deezer_url(*args, qs: Optional[dict] = None) -> str:
     args = list(args)
+    url = '/'.join([DEEZER_API_ROOT, *args])
     if qs:
-        pairs = [
-            f'{name}={value}'
-            for name, value in qs.items()
-        ]
-        args.append('?' + '&'.join(pairs))
-    return '/'.join([DEEZER_API_ROOT, *args])
-
-
-def parse_input(list_type: str, list_id: str) -> str:
-    parts = list_id.split('/')
-    res = (list_type, list_id)
-    if len(parts) >= 2:
-        if parts[-1].isdigit():
-            res = parts[-2:]
-        if parts[-2].isdigit():
-            res = parts[-3:]
-    return '/'.join(res)
+        url += '?' + urlencode(qs)
+    return url
 
 
 def build_api_url(url: str, index=0, limit=50) -> Optional[APIUrl]:
@@ -152,13 +145,13 @@ def build_api_url(url: str, index=0, limit=50) -> Optional[APIUrl]:
         return
 
     if parts[-2] == 'album':
-        return APIUrl('album', deezer_url('album', parts[-1], qs=qs))
+        return APIUrl('album', deezer_url('album', parts[-1]))
 
     if parts[-2] == 'artist':
         return APIUrl('artist', deezer_url('artist', parts[-1], 'top', qs=qs))
 
     if parts[-2] == 'playlist':
-        return APIUrl('playlist', deezer_url('playlist', parts[-1], qs=qs))
+        return APIUrl('playlist', deezer_url('playlist', parts[-1]))
 
     if parts[-2] == 'profile':
         return APIUrl('profile', deezer_url('user', parts[-1], 'tracks', qs=qs))
@@ -167,7 +160,7 @@ def build_api_url(url: str, index=0, limit=50) -> Optional[APIUrl]:
         return APIUrl('profile', deezer_url('user', parts[-2], 'tracks', qs=qs))
 
     if parts[-2] == 'track':
-        return APIUrl('track', deezer_url('track', parts[-1], qs=qs))
+        return APIUrl('track', deezer_url('track', parts[-1]))
 
 
 def get_user(url: str) -> str:
@@ -186,7 +179,7 @@ def get_user(url: str) -> str:
     return data['name']
 
 
-def get_tracks(url: str, index=0, limit=50) -> Playlist:
+def get_playlist(url: str, index=0, limit=50) -> Playlist:
     logger.info('💎 Fetching tracks from %s', url)
     api_url = build_api_url(url, index, limit)
 
@@ -245,23 +238,19 @@ def get_tracks(url: str, index=0, limit=50) -> Playlist:
 
 
 def extract_video_id(qs: str) -> Optional[str]:
-    vid = html.unescape(qs)
-    try:
-        parts = [p.split('=') for p in vid.split('&')]
-        for name, value in parts:
-            if name == 'v':
-                return value
-    except Exception as e:
-        logger.exception(e)
-    return
+    qs = html.unescape(qs)
+    qs = parse_qs(qs)
+    if 'v' in qs:
+        return qs['v'][0]
 
 
 def get_video_id(song_name) -> Optional[str]:
     search_res = requests.get(f'https://m.youtube.com/results?search_query={song_name}')
     search_res = search_res.content.decode('utf-8')
     videos = YOUTUBE_VIDEO_REGEX.findall(search_res)
-    video_id = extract_video_id(videos[0])
-    return video_id
+    if videos:
+        video_id = extract_video_id(videos[0])
+        return video_id
 
 
 def get_song_name(track: dict):
@@ -298,6 +287,12 @@ class PlaylistWriter(object):
             path = os.path.join(output_dir, f'{name}.m3u')
             self.file = open(path, 'w')
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
     def write(self, song_path: str):
         if self.file:
             song_path = os.path.relpath(song_path, self.output_dir)
@@ -318,7 +313,7 @@ class Loader(object):
         self.tree = tree
 
         self.playlists = [
-            get_tracks(url, index, limit)
+            get_playlist(url, index, limit)
             for url in urls
         ]
         if len(self.playlists) == 1:
