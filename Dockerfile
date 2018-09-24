@@ -12,6 +12,8 @@ ENV PYTHONUNBUFFERED 1
 ENV DEEZLOAD_DEBUG 0
 ENV DEEZLOAD_UI web
 ENV DEEZLOAD_HOME /output
+# update youtube_dl before starting server
+ENV UPYT 1
 
 COPY . ./
 
@@ -19,4 +21,4 @@ COPY . ./
 EXPOSE 8000
 VOLUME /output
 
-CMD [ "python", "deezload/cmd.py" ]
+CMD [ "./run.sh" ]

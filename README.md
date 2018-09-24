@@ -127,7 +127,11 @@ deezload --ui tk  # just for sure
 Launch web application from docker container.
 
 ```bash
+# run:
 docker run -v /host/abs/path/to/output:/output -p 8000:8000 aiven/deezload
+
+# don't update youtube_dl on launch:
+docker run -v /foo:/output -p 8000:8000 -e "UPYT=0" aiven/deezload
 ```
 
 
@@ -161,3 +165,4 @@ As the result of processing in output directory you should find m3u playlist and
 - `DEEZLOAD_DEBUG` - `0` or `1`, activates debug logging
 - `DEEZLOAD_UI` - `tk` or `web`
 - `DEEZLOAD_HOME` - output directory
+- `UPYT` - `1` (default) or `0`. Update `youtube_dl` when running `run.sh` or docker image.
