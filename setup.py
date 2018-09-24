@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name='deezload',
-    version='0.2.2',
+    version='0.2.3',
     packages=['deezload'],
     include_package_data=True,
     url='https://github.com/vanyakosmos/deezload',
