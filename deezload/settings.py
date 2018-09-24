@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 
+ROOT_PATH = os.path.dirname(os.path.realpath(__file__))
 DEBUG = os.environ.get('DEEZLOAD_DEBUG', '0') == '1'
 UI_TYPE = os.environ.get('DEEZLOAD_UI', 'tk').lower()
 

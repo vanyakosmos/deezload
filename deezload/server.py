@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 
 from sanic import Sanic
 from sanic.request import Request
@@ -7,11 +8,11 @@ from sanic.response import html
 from sanic.websocket import WebSocketCommonProtocol as WebSocket
 
 from deezload.base import AppException, LoadStatus, Loader
-from deezload.settings import HOME_DIR
+from deezload.settings import HOME_DIR, ROOT_PATH
 
 
 app = Sanic()
-app.static('/static', './static')
+app.static('/static', os.path.join(ROOT_PATH, 'static'))
 logger = logging.getLogger(__name__)
 
 
@@ -116,7 +117,7 @@ async def load(_: Request, ws: WebSocket):
 
 @app.route("/")
 async def index(_):
-    return html(open('index.html').read())
+    return html(open(os.path.join(ROOT_PATH, 'index.html')).read())
 
 
 def start_server(debug=False):
