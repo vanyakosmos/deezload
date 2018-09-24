@@ -39,3 +39,9 @@
     font-weight: bold;
     word-wrap: break-word;
 }
+
+.playlist-name {
+    font-size: 1.5rem;
+    text-align: center;
+    padding-bottom: 20px;
+}

@@ -10,6 +10,7 @@ let loadWin = document.getElementById('load-win');
 let mainForm = document.getElementById('main-form');
 let progress = document.getElementById('progress');
 let logs = document.getElementById('logs');
+let playlistName = document.getElementById('playlist-name');
 
 let downloadButton = document.getElementById('download-btn');
 let stopButton = document.getElementById('stop-btn');
@@ -67,6 +68,7 @@ mainForm.onsubmit = function (event) {
         'limit': parseInt(formData.get('limit').toString()),
         'format': formData.get('format'),
         'tree': !!formData.get('tree'),
+        'playlist': formData.get('playlist'),
     };
     socket.send(JSON.stringify(data));
 };
@@ -74,7 +76,10 @@ mainForm.onsubmit = function (event) {
 socket.onmessage = function (event) {
     let data = JSON.parse(event.data);
 
-    if (data.type === 'status') {
+    if (data.type === 'playlist_name') {
+        playlistName.innerText = data.message;
+
+    } else if (data.type === 'status') {
         if (data.status === 'starting') {
             addLog('start-msg', data.message, true);
         }

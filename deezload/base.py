@@ -311,7 +311,7 @@ class PlaylistWriter(object):
 
 class Loader(object):
     def __init__(self, urls: Union[str, List[str]], output_dir=None,
-                 index=0, limit=50, format='mp3', tree=False):
+                 index=0, limit=50, format='mp3', tree=False, playlist_name=None):
         if isinstance(urls, str):
             urls = [urls]
         self.format = format
@@ -321,6 +321,12 @@ class Loader(object):
             get_tracks(url, index, limit)
             for url in urls
         ]
+        if len(self.playlists) == 1:
+            pl = self.playlists[0]
+            self.playlists[0] = Playlist(
+                name=playlist_name or pl.name,
+                tracks=pl.tracks,
+            )
         self.size = sum(map(len, (p.tracks for p in self.playlists)))
 
         output_dir = output_dir or HOME_DIR

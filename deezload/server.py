@@ -21,6 +21,15 @@ async def recv(ws: WebSocket) -> dict:
     return data
 
 
+async def send_message(ws: WebSocket, type_: str, message='ok', kw=None):
+    kw = kw or {}
+    await ws.send(json.dumps({
+        'type': type_,
+        'message': message,
+        **kw,
+    }))
+
+
 async def load_cycle(ws: WebSocket):
     data = await recv(ws)
     if data['type'] != 'start':
@@ -34,23 +43,22 @@ async def load_cycle(ws: WebSocket):
             limit=data.get('limit'),
             format=data.get('format'),
             tree=data.get('tree'),
+            playlist_name=data.get('playlist') or None,
         )
-        await ws.send(json.dumps({
-            'type': 'start',
-            'message': 'ok',
-        }))
+        await send_message(ws, 'start')
 
     except AppException as e:
         logger.warning(e)
-        await ws.send(json.dumps({
-            'type': 'error',
-            'message': str(e),
-        }))
+        await send_message(ws, 'error', str(e))
         return
 
     except Exception as e:
         logger.exception(e)
         return
+
+    # share playlist name
+    name = loader.playlists[0].name
+    await send_message(ws, 'playlist_name', name)
 
     should_stop = False
     loaded, existed, skipped = 0, 0, 0
@@ -62,7 +70,7 @@ async def load_cycle(ws: WebSocket):
         elif status == LoadStatus.LOADING:
             message = "loading audio..."
         elif status == LoadStatus.MOVING:
-            message = f"moving file to {track.rel_path}..."
+            message = f"moving file..."
         elif status == LoadStatus.RESTORING_META:
             message = "restoring meta data..."
 
@@ -79,14 +87,12 @@ async def load_cycle(ws: WebSocket):
             message = None
 
         if message:
-            await ws.send(json.dumps({
-                'type': 'status',
+            await send_message(ws, 'status', message, {
                 'status': str(status),
-                'message': message,
                 'index': i,
                 'prog': prog,
                 'size': len(loader)
-            }))
+            })
             resp = await recv(ws)
             if resp['type'] == 'stop':
                 should_stop = True
@@ -94,13 +100,11 @@ async def load_cycle(ws: WebSocket):
         if should_stop and status in LoadStatus.finite_states():
             break
 
-    await ws.send(json.dumps({
-        'type': 'complete',
-        'message': 'ok',
+    await send_message(ws, 'complete', kw={
         'loaded': loaded,
         'existed': existed,
         'skipped': skipped,
-    }))
+    })
 
 
 @app.websocket('/load')
