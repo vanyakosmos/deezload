@@ -4,12 +4,13 @@ import os
 import re
 import shutil
 from enum import Enum, auto
-from pathlib import Path
 from typing import List, NamedTuple, Optional, Union
 
 import mutagen
 import requests
 from youtube_dl import YoutubeDL
+
+from deezload.settings import HOME_DIR
 
 
 DEEZER_API_ROOT = "https://api.deezer.com"
@@ -322,7 +323,7 @@ class Loader(object):
         ]
         self.size = sum(map(len, (p.tracks for p in self.playlists)))
 
-        output_dir = output_dir or os.path.join(str(Path.home()), 'deezload')
+        output_dir = output_dir or HOME_DIR
         self.output_dir = os.path.abspath(output_dir)
         os.makedirs(self.output_dir, exist_ok=True)
         logger.debug('output dir: %s', self.output_dir)

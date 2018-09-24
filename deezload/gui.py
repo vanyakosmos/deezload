@@ -1,12 +1,11 @@
 import logging
-import os
 import threading
-from pathlib import Path
 from tkinter import *
 from tkinter import filedialog
 from tkinter.ttk import Progressbar
 
 from deezload.base import LoadStatus, Loader
+from deezload.settings import HOME_DIR
 from deezload.utils import setup_logging
 
 
@@ -30,7 +29,7 @@ class Application(Frame):
         self.columnconfigure(0, weight=1)
 
         self.url = StringVar()
-        self.output_dir = StringVar(value=os.path.join(str(Path.home()), 'deezload'))
+        self.output_dir = StringVar(value=HOME_DIR)
         self.format = StringVar()
         self.index = StringVar(value='0')
         self.limit = StringVar(value='50')

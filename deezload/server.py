@@ -7,6 +7,7 @@ from sanic.response import html
 from sanic.websocket import WebSocketCommonProtocol as WebSocket
 
 from deezload.base import AppException, LoadStatus, Loader
+from deezload.settings import HOME_DIR
 
 
 app = Sanic()
@@ -28,7 +29,7 @@ async def load_cycle(ws: WebSocket):
     try:
         loader = Loader(
             urls=data.get('url'),
-            output_dir='../output',
+            output_dir=HOME_DIR,
             index=data.get('index'),
             limit=data.get('limit'),
             format=data.get('format'),
@@ -61,12 +62,12 @@ async def load_cycle(ws: WebSocket):
         elif status == LoadStatus.LOADING:
             message = "loading audio..."
         elif status == LoadStatus.MOVING:
-            message = "moving file..."
+            message = f"moving file to {track.rel_path}..."
         elif status == LoadStatus.RESTORING_META:
-            message = "restoring file meta data..."
+            message = "restoring meta data..."
 
         elif status == LoadStatus.SKIPPED:
-            message = "wasn't able to find track"
+            message = "wasn't able to find video for track"
             skipped += 1
         elif status == LoadStatus.EXISTED:
             message = f"track already exists at {track.path}"
