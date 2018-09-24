@@ -20,7 +20,7 @@ Utility for downloading playlists, artist's top tracks, albums and favorite user
   - [docker](#pull-from-docker-hub)
 - [usage](#usage)
 	- [command line](#command-line)
-  - [web gui](web-gui)
+  - [web gui](#web-gui)
   - [tk gui](#tk-gui)
   - [docker](#docker)
 - [build standalone app](#build-standalone-app)
