@@ -215,18 +215,20 @@ class Application(Frame):
 
 
 def center(win, width=None, height=None):
-    if not width or not height:
-        win.update_idletasks()
+    win.withdraw()
+    win.update_idletasks()
     width = width or win.winfo_width()
     height = height or win.winfo_height()
-    x = (win.winfo_screenwidth() // 2) - (width // 2)
-    y = (win.winfo_screenheight() // 2) - (height // 2)
-    win.geometry(f'{width}x{height}+{x}+{y}')
+    x = (win.winfo_screenwidth() // 3) - (width // 2)
+    y = (win.winfo_screenheight() // 3) - (height // 2)
+    win.geometry(f'+{x}+{y}')
+    win.deiconify()
 
 
 def raise_to_the_top(win):
     win.lift()
-    win.call('wm', 'attributes', '.', '-topmost', True)
+    win.attributes("-topmost", True)
+    win.focus_force()
     win.after_idle(win.call, 'wm', 'attributes', '.', '-topmost', False)
 
 
@@ -239,6 +241,7 @@ def start_app():
     root.resizable(width=False, height=False)
 
     raise_to_the_top(root)
+    root.after(1, lambda: root.focus_force())
     app.mainloop()
 
 
