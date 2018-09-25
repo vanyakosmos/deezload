@@ -31,9 +31,11 @@ class Application(Frame):
         self.url = StringVar()
         self.output_dir = StringVar(value=HOME_DIR)
         self.format = StringVar()
+        self.playlist_name = StringVar()
         self.index = StringVar(value='0')
         self.limit = StringVar(value='50')
         self.use_tree = StringVar(value='1')
+        self.slugify = StringVar(value='0')
         self.logs_var = StringVar(value='foo')
         self.should_stop = False
 
@@ -87,32 +89,43 @@ class Application(Frame):
                     return False
             return True
 
+        playlist_lbl = Label(frame, text='Playlist name')
+        playlist_lbl.grid(row=0, column=0, sticky='w')
+
+        playlist_inp = Entry(frame, textvariable=self.playlist_name)
+        playlist_inp.grid(row=0, column=1, sticky='ew', columnspan=5)
+
         index_label = Label(frame, text='Start index')
-        index_label.grid(row=0, column=0, sticky='w')
+        index_label.grid(row=1, column=0, sticky='w')
 
         index_entry = Entry(frame, textvariable=self.index, validate="key")
         index_entry['validatecommand'] = (index_entry.register(validate_int), '%P', '%d')
-        index_entry.grid(row=0, column=1, sticky='w')
+        index_entry.grid(row=1, column=1, sticky='w')
 
         limit_label = Label(frame, text='Load limit')
-        limit_label.grid(row=1, column=0, sticky='w')
+        limit_label.grid(row=2, column=0, sticky='w')
 
         limit_entry = Entry(frame, textvariable=self.limit, validate="key")
         limit_entry['validatecommand'] = (limit_entry.register(validate_int), '%P', '%d')
-        limit_entry.grid(row=1, column=1, sticky='w')
+        limit_entry.grid(row=2, column=1, sticky='w')
 
         format_label = Label(frame, text='Audio format')
-        format_label.grid(row=2, column=0, sticky='w')
+        format_label.grid(row=3, column=0, sticky='w')
 
         format_options = ('mp3', 'flac')
         self.format.set(format_options[0])
         format_menu = OptionMenu(frame, self.format, *format_options)
-        format_menu.grid(row=2, column=1, sticky='w')
+        format_menu.grid(row=3, column=1, sticky='w')
 
         tree_checkbox = Checkbutton(frame, text="save as tree (artist / album / song)",
                                     onvalue='1', offvalue='0',
                                     variable=self.use_tree)
-        tree_checkbox.grid(row=3, column=0, sticky='w', columnspan=2)
+        tree_checkbox.grid(row=4, column=0, sticky='w', columnspan=2)
+
+        slugify_checkbox = Checkbutton(frame, text="slugify",
+                                       onvalue='1', offvalue='0',
+                                       variable=self.slugify)
+        slugify_checkbox.grid(row=5, column=0, sticky='w', columnspan=2)
 
     def set_download_frame(self, frame: Frame):
         self.download_btn = Button(frame, text='Download', width=24,
@@ -168,6 +181,8 @@ class Application(Frame):
                 limit=int(self.limit.get()),
                 format=self.format.get(),
                 tree=self.use_tree.get() == '1',
+                playlist_name=self.playlist_name.get(),
+                slugify=self.slugify.get() == '1',
             )
             self.set_progress(0)
             self.output_dir.set(loader.output_dir)
