@@ -31,6 +31,8 @@ def main():
     parser.add_argument('--flat', action='store_false',
                         help='save files as simple list instead of '
                              'as tree: artist/album/song (default false)')
+    parser.add_argument('--no-slug', action='store_false',
+                        help="don't slugify songs names")
     parser.add_argument('--ui', type=str, choices=('tk', 'web'), default='tk',
                         help="ui type (default tk)")
     parser.add_argument('--build', type=str, default=None,
@@ -52,6 +54,7 @@ def main():
             limit=args.limit,
             format=args.format,
             tree=not args.flat,
+            slugify=not args.no_slug
         )
         loader.load()
     elif args.ui == 'web' or UI_TYPE == 'web':

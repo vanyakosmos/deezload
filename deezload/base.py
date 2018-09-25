@@ -19,6 +19,15 @@ YOUTUBE_VIDEO_REGEX = re.compile(r'/watch\?([^\"]+)', re.I | re.M | re.U)
 logger = logging.getLogger(__name__)
 
 
+def normalise_path(s: str, slugify=False):
+    """make string path-friendly"""
+    s = ''.join(c for c in s if c.isalnum() or c == ' ')
+    s = re.sub(r' +', ' ', s)
+    if slugify:
+        s = s.lower().replace(' ', '_')
+    return s
+
+
 class AppException(Exception):
     pass
 
@@ -61,29 +70,18 @@ class Track(object):
         if self.video_id is None:
             logger.debug("Didn't find video for track %r", self.short_name)
 
-    def pf(self, s: str):
-        """make string path-friendly"""
-        s = s.replace(os.sep, '|')
-        s = s.replace('/', '|')
-        return s
-
-    def pf_bulk(self, *args):
-        return [
-            self.pf(a)
-            for a in args
-        ]
-
-    def set_output_path(self, output_dir: str, ext='mp3', tree=False) -> str:
+    def set_output_path(self, output_dir: str, ext='mp3', tree=False, slugify=False) -> str:
         """
         Should return absolute path to track's basedir.
         """
         if tree:
-            artist, album, title = self.pf_bulk(self.artist, self.album, self.title)
+            artist, album, title = map(lambda x: normalise_path(x, slugify),
+                                       (self.artist, self.album, self.title))
             dir_path = os.path.join(output_dir, artist, album)
             self.path = os.path.join(dir_path, f'{title}.{ext}')
             return dir_path
         else:
-            name = self.pf(self.full_name)
+            name = normalise_path(self.full_name, slugify)
             self.path = os.path.join(output_dir, f'{name}.{ext}')
             return output_dir
 
@@ -306,11 +304,13 @@ class PlaylistWriter(object):
 
 class Loader(object):
     def __init__(self, urls: Union[str, List[str]], output_dir=None,
-                 index=0, limit=50, format='mp3', tree=False, playlist_name=None):
+                 index=0, limit=50, format='mp3', tree=False,
+                 playlist_name=None, slugify=True):
         if isinstance(urls, str):
             urls = [urls]
         self.format = format
         self.tree = tree
+        self.slugify = slugify
 
         self.playlists = [
             get_playlist(url, index, limit)
@@ -336,7 +336,8 @@ class Loader(object):
         for i, track in enumerate(tracks):
             yield LoadStatus.STARTING, track, i, 0
             # check if file already loaded
-            track_dir = track.set_output_path(self.output_dir, self.format, self.tree)
+            track_dir = track.set_output_path(self.output_dir, self.format,
+                                              self.tree, self.slugify)
             os.makedirs(track_dir, exist_ok=True)
             if os.path.exists(track.path):
                 yield LoadStatus.EXISTED, track, i, 1

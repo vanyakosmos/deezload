@@ -30,14 +30,26 @@ class TrackTests(unittest.TestCase):
     def test_path_escaping(self):
         track = Track(
             artist='The Beatles',
-            album=f'The Beatles {os.sep} foo baz',
-            title=f'Blackbird {os.sep}{os.sep} (foo bar)',
+            album=f'The Beatles / "foo" baz',
+            title=f'Blackbird \\ (foo bar)',
         )
         output_dir = os.path.join('three', 'two')
-        rel_dir = track.set_output_path(output_dir, ext='mp3', tree=True)
-        true_rel_dir = os.path.join('three', 'two', 'The Beatles', 'The Beatles | foo baz')
+        rel_dir = track.set_output_path(output_dir, ext='mp3', tree=True, slugify=False)
+        true_rel_dir = os.path.join('three', 'two', 'The Beatles', 'The Beatles foo baz')
         self.assertEqual(true_rel_dir, rel_dir)
-        self.assertEqual(os.path.join(true_rel_dir, 'Blackbird || (foo bar).mp3'), track.path)
+        self.assertEqual(os.path.join(true_rel_dir, 'Blackbird foo bar.mp3'), track.path)
+
+    def test_path_escaping_with_slug(self):
+        track = Track(
+            artist='The Beatles',
+            album=f'The Beatles / "foo" baz',
+            title=f'Blackbird \\ (foo bar)',
+        )
+        output_dir = os.path.join('three', 'two')
+        rel_dir = track.set_output_path(output_dir, ext='mp3', tree=True, slugify=True)
+        true_rel_dir = os.path.join('three', 'two', 'the_beatles', 'the_beatles_foo_baz')
+        self.assertEqual(true_rel_dir, rel_dir)
+        self.assertEqual(os.path.join(true_rel_dir, 'blackbird_foo_bar.mp3'), track.path)
 
     def test_metadata_restoration(self):
         track = Track(
