@@ -94,6 +94,9 @@ socket.onmessage = function (event) {
         else if (data.status === 'failed') {
             addLog('warn-msg', data.message, false);
         }
+        else if (data.status === 'error') {
+            addLog('error-msg', data.message, true);
+        }
         else {
             addLog('info-msg', data.message, false);
         }

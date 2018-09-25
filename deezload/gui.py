@@ -173,6 +173,7 @@ class Application(Frame):
 
     def download(self):
         try:
+            self.show_error('')
             self.show_msg('loading tracks...')
             loader = Loader(
                 urls=self.url.get(),
@@ -209,6 +210,9 @@ class Application(Frame):
                     loaded += 1
                     logger.debug('loaded track %s', track)
 
+                elif status == LoadStatus.ERROR:
+                    self.show_error('something went horribly wrong')
+
                 self.set_progress(int((i + prog) / len(loader) * 100))
 
                 if self.should_stop and status in LoadStatus.finite_states():
@@ -218,13 +222,12 @@ class Application(Frame):
             self.show_msg(f"DONE. loaded: {loaded}, skipped: {skipped}, failed: {failed}")
         except Exception as e:
             logger.exception(e)
-            self.info_label.config(text=str(e), fg='red')
-            self.info_label.update()
+            self.show_msg('')
+            self.show_error(str(e))
         finally:
             self.download_btn.configure(state=NORMAL)
             self.stop_btn.configure(state=DISABLED)
             self.should_stop = False
-            self.show_error('')
 
 
 def center(win, width=None, height=None):

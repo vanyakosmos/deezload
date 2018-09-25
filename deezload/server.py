@@ -96,6 +96,9 @@ async def load_cycle(ws: WebSocket):
         elif status == LoadStatus.FINISHED:
             loaded += 1
             message = "done!"
+
+        elif status == LoadStatus.ERROR:
+            message = '😡 something went horribly wrong 😡'
         else:
             message = None
 

@@ -46,6 +46,7 @@ class LoadStatus(Enum):
     FINISHED = auto()
     SKIPPED = auto()
     FAILED = auto()
+    ERROR = auto()
 
     def __str__(self):
         return self._name_.lower()
@@ -373,18 +374,22 @@ class Loader(object):
             last_index = 0
             for playlist in self.playlists:
                 pw = PlaylistWriter(self.output_dir, playlist.name)
-                for status, track, i, prog in self.load_tracks(ydl, playlist.tracks):
-                    if status in (LoadStatus.FINISHED, LoadStatus.SKIPPED):
-                        pw.write(track.path)
+                try:
+                    for status, track, i, prog in self.load_tracks(ydl, playlist.tracks):
+                        if status in (LoadStatus.FINISHED, LoadStatus.SKIPPED):
+                            pw.write(track.path)
 
-                    yield status, track, last_index + i, prog
-                last_index = len(playlist.tracks)
+                        yield status, track, last_index + i, prog
+                    last_index = len(playlist.tracks)
+                except Exception as e:
+                    logger.exception(e)
+                    yield LoadStatus.ERROR, None, 0, 0
                 pw.close()
 
     def load(self):
         for status, track, i, prog in self.load_gen():
             if status == LoadStatus.STARTING:
-                logger.info("🔥 starting loading: %r", track)
+                logger.info("✅ starting loading: %r", track)
             elif status == LoadStatus.SEARCHING:
                 logger.info("\tsearching for video...")
             elif status == LoadStatus.LOADING:
@@ -400,3 +405,5 @@ class Loader(object):
                 logger.info("\ttrack already exists at %s", track.path)
             elif status == LoadStatus.FINISHED:
                 logger.info("\tdone!")
+            elif status == LoadStatus.ERROR:
+                logger.info("\t😡 something went horribly wrong!")

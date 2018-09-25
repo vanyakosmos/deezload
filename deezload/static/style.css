@@ -24,6 +24,12 @@
     background: rgba(220, 255, 37, 0.1);
 }
 
+.error-msg {
+    background: rgba(255, 89, 59, 0.9);
+    color: rgb(245, 245, 245);
+    text-align: center;
+}
+
 .stop-msg {
     background: rgba(255, 89, 59, 0.2);
 }
