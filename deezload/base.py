@@ -16,15 +16,20 @@ from deezload.settings import HOME_DIR
 
 DEEZER_API_ROOT = "https://api.deezer.com"
 YOUTUBE_VIDEO_REGEX = re.compile(r'/watch\?([^\"]+)', re.I | re.M | re.U)
+NOT_ALLOWED_PATH_CHARS = set(r'<>:"/\\|?*')
 logger = logging.getLogger(__name__)
 
 
-def normalise_path(s: str, slugify=False):
+def normalise(s: str, slugify=False):
     """make string path-friendly"""
-    s = ''.join(c for c in s if c.isalnum() or c == ' ')
-    s = re.sub(r' +', ' ', s)
     if slugify:
+        s = ''.join(c for c in s if c.isalnum() or c == ' ')
+        s = re.sub(r' +', ' ', s)
         s = s.lower().replace(' ', '_')
+        return s
+    s = s.replace('"', '\'')
+    s = ''.join(c for c in s if c not in NOT_ALLOWED_PATH_CHARS)
+    s = re.sub(r' +', ' ', s)
     return s
 
 
@@ -39,15 +44,15 @@ class LoadStatus(Enum):
     MOVING = auto()
     RESTORING_META = auto()
     FINISHED = auto()
-    EXISTED = auto()
     SKIPPED = auto()
+    FAILED = auto()
 
     def __str__(self):
         return self._name_.lower()
 
     @staticmethod
     def finite_states():
-        return LoadStatus.FINISHED, LoadStatus.EXISTED, LoadStatus.SKIPPED
+        return LoadStatus.FINISHED, LoadStatus.SKIPPED, LoadStatus.FAILED
 
 
 class Track(object):
@@ -75,13 +80,13 @@ class Track(object):
         Should return absolute path to track's basedir.
         """
         if tree:
-            artist, album, title = map(lambda x: normalise_path(x, slugify),
+            artist, album, title = map(lambda x: normalise(x, slugify),
                                        (self.artist, self.album, self.title))
             dir_path = os.path.join(output_dir, artist, album)
             self.path = os.path.join(dir_path, f'{title}.{ext}')
             return dir_path
         else:
-            name = normalise_path(self.full_name, slugify)
+            name = normalise(self.full_name, slugify)
             self.path = os.path.join(output_dir, f'{name}.{ext}')
             return output_dir
 
@@ -282,6 +287,7 @@ class PlaylistWriter(object):
         self.file = None
         self.output_dir = output_dir
         if name:
+            name = normalise(name)
             path = os.path.join(output_dir, f'{name}.m3u')
             self.file = open(path, 'w')
 
@@ -340,13 +346,13 @@ class Loader(object):
                                               self.tree, self.slugify)
             os.makedirs(track_dir, exist_ok=True)
             if os.path.exists(track.path):
-                yield LoadStatus.EXISTED, track, i, 1
+                yield LoadStatus.SKIPPED, track, i, 1
                 continue
             # check if video exists
             yield LoadStatus.SEARCHING, track, i, 0.1
             track.fetch_video_url()
             if not track.valid:
-                yield LoadStatus.SKIPPED, track, i, 1
+                yield LoadStatus.FAILED, track, i, 1
                 continue
             # load
             yield LoadStatus.LOADING, track, i, 0.2
@@ -368,7 +374,7 @@ class Loader(object):
             for playlist in self.playlists:
                 pw = PlaylistWriter(self.output_dir, playlist.name)
                 for status, track, i, prog in self.load_tracks(ydl, playlist.tracks):
-                    if status in (LoadStatus.FINISHED, LoadStatus.EXISTED):
+                    if status in (LoadStatus.FINISHED, LoadStatus.SKIPPED):
                         pw.write(track.path)
 
                     yield status, track, last_index + i, prog
@@ -388,9 +394,9 @@ class Loader(object):
             elif status == LoadStatus.RESTORING_META:
                 logger.info("\trestoring file meta data...")
 
-            elif status == LoadStatus.SKIPPED:
+            elif status == LoadStatus.FAILED:
                 logger.info("\t⚠️ wasn't able to find track")
-            elif status == LoadStatus.EXISTED:
+            elif status == LoadStatus.SKIPPED:
                 logger.info("\ttrack already exists at %s", track.path)
             elif status == LoadStatus.FINISHED:
                 logger.info("\tdone!")

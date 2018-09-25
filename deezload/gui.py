@@ -172,9 +172,7 @@ class Application(Frame):
             self.set_progress(0)
             self.output_dir.set(loader.output_dir)
             self.update()
-            loaded = 0
-            skipped = 0
-            existed = 0
+            loaded, skipped, failed = 0, 0, 0
             for status, track, i, prog in loader.load_gen():
                 num = f'{i + 1}/{len(loader)}'
                 if status == LoadStatus.STARTING:
@@ -188,10 +186,10 @@ class Application(Frame):
                 elif status == LoadStatus.RESTORING_META:
                     self.show_msg(f"{num} - restoring audio meta data")
 
-                elif status == LoadStatus.EXISTED:
-                    existed += 1
                 elif status == LoadStatus.SKIPPED:
                     skipped += 1
+                elif status == LoadStatus.FAILED:
+                    failed += 1
                 elif status == LoadStatus.FINISHED:
                     loaded += 1
                     logger.debug('loaded track %s', track)
@@ -202,7 +200,7 @@ class Application(Frame):
                     break
 
             self.set_progress(100)
-            self.show_msg(f"DONE. loaded: {loaded}, skipped: {skipped}, existed: {existed}")
+            self.show_msg(f"DONE. loaded: {loaded}, skipped: {skipped}, failed: {failed}")
         except Exception as e:
             logger.exception(e)
             self.info_label.config(text=str(e), fg='red')

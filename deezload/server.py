@@ -1,6 +1,8 @@
 import json
 import logging
 import os
+from pprint import pprint
+from typing import Union
 
 from sanic import Sanic
 from sanic.request import Request
@@ -22,16 +24,23 @@ async def recv(ws: WebSocket) -> dict:
     return data
 
 
-async def send_message(ws: WebSocket, type_: str, message='ok', kw=None):
-    kw = kw or {}
-    await ws.send(json.dumps({
+async def send_message(ws: WebSocket, type_: str,
+                       data: Union[str, dict, None] = None):
+    out = {
         'type': type_,
-        'message': message,
-        **kw,
-    }))
+    }
+    if isinstance(data, str):
+        out['message'] = data
+    elif isinstance(data, dict):
+        out.update(data)
+    await ws.send(json.dumps(out))
 
 
 async def load_cycle(ws: WebSocket):
+    await send_message(ws, 'setup', {
+        'output_dir': HOME_DIR
+    })
+
     data = await recv(ws)
     if data['type'] != 'start':
         return
@@ -39,30 +48,33 @@ async def load_cycle(ws: WebSocket):
     try:
         loader = Loader(
             urls=data.get('url'),
-            output_dir=HOME_DIR,
+            output_dir=data.get('output_dir'),
             index=data.get('index'),
             limit=data.get('limit'),
             format=data.get('format'),
             tree=data.get('tree'),
             playlist_name=data.get('playlist') or None,
+            slugify=data.get('slugify')
         )
         await send_message(ws, 'start')
 
     except AppException as e:
-        logger.warning(e)
         await send_message(ws, 'error', str(e))
         return
 
     except Exception as e:
         logger.exception(e)
+        await send_message(ws, 'error', str(e))
         return
 
     # share playlist name
     name = loader.playlists[0].name
-    await send_message(ws, 'playlist_name', name)
+    await send_message(ws, 'before_load', {
+        'playlist_name': name
+    })
 
     should_stop = False
-    loaded, existed, skipped = 0, 0, 0
+    loaded, skipped, failed = 0, 0, 0
     for status, track, i, prog in loader.load_gen():
         if status == LoadStatus.STARTING:
             message = track.short_name
@@ -75,12 +87,12 @@ async def load_cycle(ws: WebSocket):
         elif status == LoadStatus.RESTORING_META:
             message = "restoring meta data..."
 
-        elif status == LoadStatus.SKIPPED:
+        elif status == LoadStatus.FAILED:
             message = "wasn't able to find video for track"
-            skipped += 1
-        elif status == LoadStatus.EXISTED:
+            failed += 1
+        elif status == LoadStatus.SKIPPED:
             message = f"track already exists at {track.path}"
-            existed += 1
+            skipped += 1
         elif status == LoadStatus.FINISHED:
             loaded += 1
             message = "done!"
@@ -88,7 +100,8 @@ async def load_cycle(ws: WebSocket):
             message = None
 
         if message:
-            await send_message(ws, 'status', message, {
+            await send_message(ws, 'status', {
+                'message': message,
                 'status': str(status),
                 'index': i,
                 'prog': prog,
@@ -101,10 +114,10 @@ async def load_cycle(ws: WebSocket):
         if should_stop and status in LoadStatus.finite_states():
             break
 
-    await send_message(ws, 'complete', kw={
+    await send_message(ws, 'complete', {
         'loaded': loaded,
-        'existed': existed,
         'skipped': skipped,
+        'failed': failed,
     })
 
 

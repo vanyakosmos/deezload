@@ -14,8 +14,8 @@
 </head>
 <body>
 
-<div class="container">
-    <div class="jumbotron" style="padding: 2rem 1rem; margin-top: 20px">
+<div class="container" style="margin-top: 20px; margin-bottom: 20px">
+    <div class="jumbotron" style="padding: 2rem 1rem">
         <h1 class="display-4" style="text-align: center">deezload</h1>
     </div>
 
@@ -49,22 +49,56 @@
                 </div>
             </div>
 
-            <div class="form-group">
-                <label for="playlist-input">Playlist name (leave it empty and it will be generated automatically)</label>
-                <input name="playlist" type="text" class="form-control" id="playlist-input" placeholder="playlist">
-            </div>
-
-            <div class="form-group">
-                <div class="form-check">
-                    <input name="tree" class="form-check-input" type="checkbox" id="tree" checked
-                           autocomplete="off">
-                    <label class="form-check-label" for="tree">
-                        save as tree
+            <p>
+                <a data-toggle="collapse" href="#advanced-settings"
+                   role="button" aria-expanded="false" aria-controls="collapseExample">
+                    Advanced settings
+                </a>
+            </p>
+            <div class="collapse" id="advanced-settings">
+                <div class="form-group">
+                    <label for="output-dir">
+                        Output path
                     </label>
+                    <input name="output_dir" type="text" class="form-control" id="output-dir"
+                           placeholder="output path" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="playlist-input">
+                        Playlist name
+                    </label>
+                    <input name="playlist" type="text" class="form-control" id="playlist-input"
+                           placeholder="will be generated automatically if empty">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group col-md-4">
+                        <div class="form-check">
+                            <input name="tree" class="form-check-input" type="checkbox"
+                                   id="tree"
+                                   checked autocomplete="off">
+                            <label class="form-check-label" for="tree">
+                                save as tree
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group col-md-4">
+                        <div class="form-check">
+                            <input name="slugify" class="form-check-input" type="checkbox"
+                                   id="slugify"
+                                   autocomplete="off">
+                            <label class="form-check-label" for="slugify">
+                                slugify path
+                            </label>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <button type="submit" class="btn btn-primary btn-lg btn-block" id="download-btn">
+            <button type="submit" class="btn btn-primary btn-lg btn-block"
+                    id="download-btn">
                 download
             </button>
         </form>

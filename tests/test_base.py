@@ -35,9 +35,9 @@ class TrackTests(unittest.TestCase):
         )
         output_dir = os.path.join('three', 'two')
         rel_dir = track.set_output_path(output_dir, ext='mp3', tree=True, slugify=False)
-        true_rel_dir = os.path.join('three', 'two', 'The Beatles', 'The Beatles foo baz')
+        true_rel_dir = os.path.join('three', 'two', 'The Beatles', 'The Beatles \'foo\' baz')
         self.assertEqual(true_rel_dir, rel_dir)
-        self.assertEqual(os.path.join(true_rel_dir, 'Blackbird foo bar.mp3'), track.path)
+        self.assertEqual(os.path.join(true_rel_dir, 'Blackbird (foo bar).mp3'), track.path)
 
     def test_path_escaping_with_slug(self):
         track = Track(
@@ -237,7 +237,7 @@ class LoaderTests(unittest.TestCase):
         for status, track, i, prog in loader.load_gen():
             last_status = status
             steps += 1
-        self.assertEqual(last_status, LoadStatus.EXISTED)
+        self.assertEqual(last_status, LoadStatus.SKIPPED)
         self.assertEqual(2, steps)
 
         tracks = glob.glob(os.path.join(output_dir, '**', '*.flac'), recursive=True)
