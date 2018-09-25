@@ -1,6 +1,6 @@
 # deezload
 
-Utility for downloading playlists, artist's top tracks, albums and favorite user's tracks from Deezer.
+Tool for downloading playlists, artists top tracks, albums and favorite user's tracks from Deezer.
 
 ### pros
 
@@ -78,7 +78,7 @@ deezload https://www.deezer.com/en/artist/123
 help:
 ```
 usage: deezload [-h] [-i INDEX] [-l LIMIT] [-d] [-o OUTPUT_DIR] [-f FORMAT]
-                [--flat] [--ui {tk,web}] [--build BUILD]
+                [--flat] [--no-slug] [--ui {tk,web}] [--build BUILD]
                 [urls [urls ...]]
 
 positional arguments:
@@ -93,6 +93,7 @@ optional arguments:
   -f FORMAT      output audio file format (default mp3)
   --flat         save files as simple list instead of as tree:
                  artist/album/song (default false)
+  --no-slug      don't slugify songs names
   --ui {tk,web}  ui type (default tk)
   --build BUILD  build output path
 ```
@@ -100,7 +101,7 @@ optional arguments:
 
 ### web gui
 
-[Sanic](https://github.com/huge-success/sanic) websocket server + bootstrap.
+[Sanic](https://github.com/huge-success/sanic) + websockets + bootstrap.
 
 ```bash
 deezload --ui web
@@ -132,6 +133,14 @@ docker run -v /host/abs/path/to/output:/output -p 8000:8000 aiven/deezload
 
 # don't update youtube_dl on launch:
 docker run -v /foo:/output -p 8000:8000 -e "UPYT=0" aiven/deezload
+
+# use cmd inside container
+docker run -v /foo:/output aiven/deezload bash
+$ python deezload/cmd.py -h
+
+# tests
+docker run aiven/deezload bash
+$ python -m unittest discover tests -v 
 ```
 
 
