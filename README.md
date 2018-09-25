@@ -77,23 +77,23 @@ deezload https://www.deezer.com/en/artist/123
 
 help:
 ```
-usage: deezload [-h] [-i INDEX] [-l LIMIT] [-d] [-o OUTPUT_DIR] [-f FORMAT]
-                [--flat] [--no-slug] [--ui {tk,web}] [--build BUILD]
-                [urls [urls ...]]
+usage: cmd.py [-h] [-i INDEX] [-l LIMIT] [-d] [-o OUTPUT_DIR] [-f FORMAT]
+              [--flat] [--slug] [--ui {tk,web}] [--build BUILD]
+              [urls [urls ...]]
 
 positional arguments:
   urls           list of URLs
 
 optional arguments:
   -h, --help     show this help message and exit
-  -i INDEX       start index
-  -l LIMIT       load limit
-  -d             debug mode
+  -i INDEX       start index (default 0)
+  -l LIMIT       load limit (default 50)
+  -d             activates debug logging (default false)
   -o OUTPUT_DIR  output directory (default HOME/deezload)
   -f FORMAT      output audio file format (default mp3)
   --flat         save files as simple list instead of as tree:
                  artist/album/song (default false)
-  --no-slug      don't slugify songs names
+  --slug         slugify songs names (default false)
   --ui {tk,web}  ui type (default tk)
   --build BUILD  build output path
 ```

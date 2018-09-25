@@ -385,25 +385,3 @@ class Loader(object):
                     logger.exception(e)
                     yield LoadStatus.ERROR, None, 0, 0
                 pw.close()
-
-    def load(self):
-        for status, track, i, prog in self.load_gen():
-            if status == LoadStatus.STARTING:
-                logger.info("✅ starting loading: %r", track)
-            elif status == LoadStatus.SEARCHING:
-                logger.info("\tsearching for video...")
-            elif status == LoadStatus.LOADING:
-                logger.info("\tloading audio...")
-            elif status == LoadStatus.MOVING:
-                logger.info("\tmoving file...")
-            elif status == LoadStatus.RESTORING_META:
-                logger.info("\trestoring file meta data...")
-
-            elif status == LoadStatus.FAILED:
-                logger.info("\t⚠️ wasn't able to find track")
-            elif status == LoadStatus.SKIPPED:
-                logger.info("\ttrack already exists at %s", track.path)
-            elif status == LoadStatus.FINISHED:
-                logger.info("\tdone!")
-            elif status == LoadStatus.ERROR:
-                logger.info("\t😡 something went horribly wrong!")
