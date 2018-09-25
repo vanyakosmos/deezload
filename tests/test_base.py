@@ -12,6 +12,7 @@ from deezload.base import AppException, DEEZER_API_ROOT, LoadStatus, Loader, Pla
 SKIP_RISKY = os.environ.get('RISKY_TESTS', '0') == '1'
 SKIP_SLOW = os.environ.get('SLOW_TESTS', '0') == '1'
 SKIP_FFMPEG = os.environ.get('SKIP_FFMPEG', '0') == '1'
+THIS_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
 class TrackTests(unittest.TestCase):
@@ -33,9 +34,10 @@ class TrackTests(unittest.TestCase):
             album=f'The Beatles / "foo" baz',
             title=f'Blackbird \\ (foo bar)',
         )
-        output_dir = os.path.join('three', 'two')
+        output_dir = os.path.join(THIS_DIR, 'three', 'two')
         rel_dir = track.set_output_path(output_dir, ext='mp3', tree=True, slugify=False)
-        true_rel_dir = os.path.join('three', 'two', 'The Beatles', 'The Beatles \'foo\' baz')
+        true_rel_dir = os.path.join(THIS_DIR, 'three', 'two', 'The Beatles',
+                                    'The Beatles \'foo\' baz')
         self.assertEqual(true_rel_dir, rel_dir)
         self.assertEqual(os.path.join(true_rel_dir, 'Blackbird (foo bar).mp3'), track.path)
 
@@ -45,33 +47,46 @@ class TrackTests(unittest.TestCase):
             album=f'The Beatles / "foo" baz',
             title=f'Blackbird \\ (foo bar)',
         )
-        output_dir = os.path.join('three', 'two')
+        output_dir = os.path.join(THIS_DIR, 'three', 'two')
         rel_dir = track.set_output_path(output_dir, ext='mp3', tree=True, slugify=True)
-        true_rel_dir = os.path.join('three', 'two', 'the_beatles', 'the_beatles_foo_baz')
+        true_rel_dir = os.path.join(THIS_DIR, 'three', 'two', 'the_beatles',
+                                    'the_beatles_foo_baz')
         self.assertEqual(true_rel_dir, rel_dir)
         self.assertEqual(os.path.join(true_rel_dir, 'blackbird_foo_bar.mp3'), track.path)
 
     def test_metadata_restoration(self):
+        a1_path = os.path.join(THIS_DIR, 'a1.flac')
+        audio = mutagen.File(a1_path, easy=True)
+        audio['artist'] = 'foo'
+        audio['album'] = 'bar'
+        audio['title'] = 'baz'
+        audio.save()
         track = Track(
             artist='1',
             album='2',
             title='3',
         )
-        track.path = 'a1.flac'
+        track.path = a1_path
         track.restore_meta()
-        audio = mutagen.File('a1.flac', easy=True)
+        audio = mutagen.File(a1_path, easy=True)
         self.assertEqual('1', audio['artist'][0])
         self.assertEqual('2', audio['album'][0])
         self.assertEqual('3', audio['title'][0])
 
+        a1_path = os.path.join(THIS_DIR, 'a1.mp3')
+        audio = mutagen.File(a1_path, easy=True)
+        audio['artist'] = 'foo'
+        audio['album'] = 'bar'
+        audio['title'] = 'baz'
+        audio.save()
         track = Track(
             artist='1',
             album='2',
             title='3',
         )
-        track.path = 'a1.mp3'
+        track.path = a1_path
         track.restore_meta()
-        audio = mutagen.File('a1.mp3', easy=True)
+        audio = mutagen.File(a1_path, easy=True)
         self.assertEqual('1', audio['artist'][0])
         self.assertEqual('2', audio['album'][0])
         self.assertEqual('3', audio['title'][0])
@@ -168,14 +183,14 @@ class BaseTests(unittest.TestCase):
         self.assertTrue(id is None)
 
     def test_playlist_writer_no_name(self):
-        output_dir = '.'
+        output_dir = THIS_DIR
         pw = PlaylistWriter(output_dir, None)
         pw.write(os.path.join(output_dir, 'track.mp3'))
         pw.close()
         self.assertTrue(len(glob.glob('*.m3u')) == 0)
 
     def test_playlist_writer(self):
-        output_dir = 'output'
+        output_dir = os.path.join(THIS_DIR, 'output')
         os.makedirs(output_dir)
         pw = PlaylistWriter(output_dir, 'foo')
         pw.write(os.path.join(output_dir, 'foo', 'track.mp3'))
@@ -218,7 +233,7 @@ class LoaderTests(unittest.TestCase):
 
     @unittest.skipIf(SKIP_SLOW or SKIP_FFMPEG or SKIP_RISKY, 'slow and require ffmpeg')
     def test_skip_existed(self):
-        output_dir = 'output'
+        output_dir = os.path.join(THIS_DIR, 'output')
         loader = Loader(
             urls='https://www.deezer.com/en/profile/758196665',
             output_dir=output_dir,
